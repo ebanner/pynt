@@ -5,8 +5,9 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 ## Prerequisites
 
 - Emacs
-- jupyter notebook
+- jupyter (python)
 - EIN [[1]](http://millejoh.github.io/emacs-ipython-notebook/) and [[2]](https://github.com/millejoh/emacs-ipython-notebook)
+- epc (python)
 
 ## Using pynt
 

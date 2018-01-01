@@ -156,12 +156,6 @@ EIN cells from the python EPC client."
   (epcs:server-stop pynt-elisp-relay-server)
   (setq pynt-elisp-relay-server nil))
 
-(defun pynt-restart-elisp-relay-server ()
-  "Bring down the EPC server"
-  (interactive)
-  (pynt-stop-elisp-relay-server)
-  (pynt-start-elisp-relay-server))
-
 (defun pynt-make-code-cell-and-eval (expr buffer-name cell-type line-number)
   "EPC callback
 
@@ -221,46 +215,55 @@ corresponds to and is saved in the map."
   (epc:stop-epc pynt-ast-server)
   (setq pynt-ast-server nil))
 
-(defun pynt-restart-ast-server ()
-  "Restart the python AST server"
-  (pynt-stop-ast-server)
-  (pynt-start-ast-server))
-
-(defun pynt-start-servers ()
-  "Start the EPC server and the AST server"
-  (interactive)
-  (pynt-start-elisp-relay-server)
-  (pynt-start-ast-server))
-
-(defun pynt-restart-servers ()
-  "Restart both the EPC server and the python AST server"
-  (interactive)
-  (pynt-restart-elisp-relay-server)
-  (pynt-restart-ast-server))
-
-(defun pynt-restart-servers ()
-  "Restart both the EPC server and the python AST server"
-  (interactive)
-  (pynt-restart-elisp-relay-server)
-  (pynt-restart-ast-server))
-
 (defun pynt-grab-ein-buffer-name (old-function buffer-or-name)
+  "Advice to be added around `ein:connect-to-notebook-buffer'
+
+So pynt-mode can grab the buffer name of the main worksheet."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
   (setq pynt-main-worksheet-name buffer-or-name)
   (apply old-function (list buffer-or-name)))
 
-(advice-add #'ein:connect-to-notebook-buffer :around #'pynt-grab-ein-buffer-name)
+(setq pynt-init-code "
+
+from epc.client import EPCClient
+import time
+
+def __cell__(content, buffer_name, cell_type, line_number):
+    elisp_func = 'make-code-cell-and-eval'
+    epc_client.call_sync(elisp_func, args=[content, buffer_name, cell_type, line_number])
+    time.sleep(0.01)
+
+epc_client = EPCClient(('docker.for.mac.localhost', 9999), log_traceback=True)
+__name__ = '__pynt__'
+
+")
+
+(defun pynt-start-py-epc-client ()
+  "Initialize the EPC client for the active kernel.
+
+This needs to be done so python can send commands to emacs to create code cells."
+  (ein:shared-output-eval-string pynt-init-code))
 
 (define-minor-mode pynt-mode
-  "Minor mode for Generate and interact with jupyter notebooks with EIN"
+  "Toggle pynt-mode
+
+Minor mode for generating and interacting with jupyter notebooks via EIN"
   :lighter " pynt"
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c C-c") 'pynt-generate-worksheet)
             map)
-  (if (and pynt-elisp-relay-server pynt-ast-server)
-      (pynt-restart-servers)
-    (pynt-start-servers))
-  (add-hook 'post-command-hook #'pynt-move-cell-window :local))
-
+  (if pynt-mode
+      (progn
+        (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-grab-ein-buffer-name)
+        (add-hook 'post-command-hook #'pynt-move-cell-window :local)
+        (call-interactively 'ein:connect-to-notebook-buffer)
+        (pynt-start-ast-server)
+        (pynt-start-elisp-relay-server)
+        (pynt-start-py-epc-client)
+        (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer)))
+    (advice-remove #'ein:connect-to-notebook-buffer #'pynt-grab-ein-buffer-name)
+    (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
+    (pynt-stop-elisp-relay-server)
+    (pynt-stop-ast-server)))
 
 (provide 'pynt)

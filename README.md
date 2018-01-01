@@ -9,6 +9,11 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 - EIN [[1]](http://millejoh.github.io/emacs-ipython-notebook/) and [[2]](https://github.com/millejoh/emacs-ipython-notebook)
 - epc (python)
 
+## Installation
+
+1. Clone this repo to `/your/local/path/pynt`
+2. Add `(load-file "/your/local/path/pynt/code/pynt.el")` to your `.emacs` file
+
 ## Using pynt
 
 The first step is starting EIN just like you normally would. My workflow for that is the following.
@@ -22,9 +27,11 @@ The first step is starting EIN just like you normally would. My workflow for tha
 7. Switch to context buffer you want to inspect (i.e. `context=foo` buffer for a function `foo`)
 8. `M-x pynt-generate-worksheet RET` to generate a worksheet for this function
 
-## Future Plans
+## TODO
 
 - Make a screencast demonstrating the functionality
 - Add support for other language constructs (e.g. classes and context managers)
 - Add buffer narrowing option so one can focus on just a single cell at a time
 - Factor out notebook generator as a standalone utility separate from emacs
+- Add gutter toggle for mocking out calls that you don't want to happen (long-running or side-effecting behavior)
+- Add better support for integration with unit tests

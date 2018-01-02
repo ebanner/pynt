@@ -33,7 +33,7 @@ The first step is starting EIN just like you normally would. My workflow for tha
 
 ## TODO
 
-- Make a screencast demonstrating the functionality
+- ~~Make a screencast demonstrating the functionality~~
 - Add support for other language constructs (e.g. classes and context managers)
 - Add buffer narrowing option so one can focus on just a single cell at a time
 - Factor out notebook generator as a standalone utility separate from emacs

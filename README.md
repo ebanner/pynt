@@ -2,6 +2,10 @@
 
 Emacs package for generating and interacting with a jupyter notebooks from existing code.
 
+## Demonstration
+
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/OkdkJ2fu_Oc&feature=youtu.be/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc&feature=youtu.be "pynt Demo")
+
 ## Prerequisites
 
 - Emacs

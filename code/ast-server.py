@@ -14,6 +14,7 @@ def annotate(*code):
 
     >>> s = '''
     ... def foo():
+    ...     \"\"\"function\"\"\"
     ...     print('foo!')
     ...
     ... def bar():
@@ -22,7 +23,7 @@ def annotate(*code):
     ... def biz():
     ...     print('biz!')
     ... '''
-    >>> code = [s, 'N/A']
+    >>> code = [s, 'foo']
 
     """
     code, active_funcname = code[0], code[1]

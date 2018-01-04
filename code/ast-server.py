@@ -14,13 +14,13 @@ def annotate(*code):
 
     >>> s = '''
     ... def foo():
-    ... print('foo!')
+    ...     print('foo!')
     ...
     ... def bar():
-    ... print('bar!')
+    ...     print('bar!')
     ...
     ... def biz():
-    ... print('biz!')
+    ...     print('biz!')
     ... '''
     >>> code = [s, 'N/A']
 

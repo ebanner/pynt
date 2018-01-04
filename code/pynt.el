@@ -13,23 +13,90 @@
 ;; This package provides a minor mode to generate and interact with jupyter
 ;; notebooks via EIN from a Python script.
 
+;;; Dependencies
 (require 'cl)
 (require 'epcs)
 (require 'epc)
 
-;;; EIN-specific variables to set
-(setq print-level 2)
-(setq print-length 10)
-(setq print-circle t)
+(defgroup pynt nil "The customization group for PYthon iNTeractive")
 
-;;; Global variables
-(setq pynt-verbose t)
-(setq pynt-active-buffer-name "context=foo")
-(setq pynt-active-defun-name "foo")
-(setq pynt-main-worksheet-name "Untitled.ipynb")
-(setq pynt-line-number-to-cell-location-map (make-hash-table :test 'equal))
-(setq pynt-elisp-relay-server nil)
-(setq pynt-ast-server nil)
+;;; Variables
+(defcustom pynt-elisp-relay-server-hostname "localhost"
+  "The hostname of the elisp relay server. Usually `localhost'
+  but if the jupyter kernel is running inside a docker container
+  then this value should be `docker.for.mac.localhost' when on a
+  mac."
+  :options '("localhost" "docker.for.mac.localhost"))
+
+(defvar pynt-port 9999
+  "The port that the current EPC client and server are communicating on.
+
+Every invocation of `pynt-mode' increments this number so there
+can be multiple EPC client-server pairs.")
+
+(defvar pynt-init-code
+  (format "
+
+%%matplotlib inline
+from epc.client import EPCClient
+import time
+
+epc_client = EPCClient((%S, %S), log_traceback=True)
+
+def __cell__(content, buffer_name, cell_type, line_number):
+    elisp_func = 'make-code-cell-and-eval'
+    epc_client.call_sync(elisp_func, args=[content, buffer_name, cell_type, line_number])
+    time.sleep(0.01)
+
+__name__ = '__pynt__'
+
+" pynt-elisp-relay-server-hostname pynt-port)
+  "The code that gets evaluated when pynt-mode is activated.
+  Provides an interface for python code to make and execute EIN
+  cells.")
+
+(defvar pynt-verbose t
+  "Logging flag.
+
+Log `pynt-mode' debugging information if `t' and do not otherwise.")
+
+(defvar-local pynt-active-defun-name "foo"
+  "The active function name.
+
+This is the function who will have code cells made from
+it/annotated/rolled out/whatever you want to call it. Needs to be
+the name of a python function in the current buffer or the value
+'outside' to indicate the code outside of any function.")
+
+(defvar-local pynt-active-buffer-name (format "context=%S" pynt-active-defun-name)
+  "The active buffer name.
+
+When you run `pynt-generate-worksheet' this is the buffer that
+will have code cells added to it and evaluated. Is always of the
+form 'context=`pynt-active-defun-name''")
+
+(defvar-local pynt-main-worksheet-name "Untitled.ipynb"
+  "Name of the connected notebook.
+
+This variable holds the name of the notebook associated with the
+current `pynt-mode' session. The value gets set when you can
+`pynt-mode' and choose a EIN notebook name.'")
+
+(defvar-local pynt-line-number-to-cell-location-map (make-hash-table :test 'equal)
+  "Table mapping of source code lines to EIN cells.
+
+This table is used to scroll the EIN buffer along with the code buffer.")
+
+(defvar-local pynt-elisp-relay-server nil
+  "Elisp relay server")
+
+(defvar-local pynt-ast-server nil
+  "Python AST server")
+
+;;; Set these variables to accomodate EIN recursive data structures
+(setq-local print-level 2)
+(setq-local print-length 10)
+(setq-local print-circle t)
 
 ;;; Helper functions
 (defun pynt-get-buffer-string ()
@@ -114,14 +181,19 @@ This is the main function which kicks off much of the work."
     (pynt-annotate-make-cells-eval code)))
 
 (defun pynt-move-cell-window ()
+  "Scroll the worksheet buffer
+
+Do it so the cell which corresponds to the line of code the point is on goes to the top."
   (interactive)
-  (save-selected-window
-    (let ((window (get-buffer-window pynt-active-buffer-name))
-          (cell-location (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map)))
-      (when cell-location
-        (select-window window)
-        (goto-char cell-location)
-        (recenter 5)))))
+  (when (not (string-prefix-p "context=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
+    (save-selected-window
+      (let ((window (get-buffer-window pynt-active-buffer-name))
+            (cell-location (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map))
+            (point-line (count-screen-lines (window-start) (point))))
+        (when cell-location
+          (select-window window)
+          (goto-char cell-location)
+          (recenter point-line))))))
 
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in a notebook who has a buffer called *epc-client*"
@@ -150,7 +222,7 @@ EIN cells from the python EPC client."
                   (pynt-log "(make-code-cell-and-eval %S %S %S %S)..." expr buffer-name cell-type line-number)
                   (pynt-make-code-cell-and-eval expr buffer-name cell-type line-number)
                   nil)))))))
-    (setq pynt-elisp-relay-server (epcs:server-start connect-function 9999))))
+    (setq pynt-elisp-relay-server (epcs:server-start connect-function pynt-port))))
 
 (defun pynt-stop-elisp-relay-server ()
   (epcs:server-stop pynt-elisp-relay-server)
@@ -215,6 +287,12 @@ corresponds to and is saved in the map."
   (epc:stop-epc pynt-ast-server)
   (setq pynt-ast-server nil))
 
+(defun pynt-start-py-epc-client ()
+  "Initialize the EPC client for the active kernel.
+
+This needs to be done so python can send commands to emacs to create code cells."
+  (ein:shared-output-eval-string pynt-init-code))
+
 (defun pynt-grab-ein-buffer-name (old-function buffer-or-name)
   "Advice to be added around `ein:connect-to-notebook-buffer'
 
@@ -223,26 +301,20 @@ So pynt-mode can grab the buffer name of the main worksheet."
   (setq pynt-main-worksheet-name buffer-or-name)
   (apply old-function (list buffer-or-name)))
 
-(setq pynt-init-code "
+(defun pynt-init-servers ()
+  "Start AST and elisp relay server along with python EPC client
 
-from epc.client import EPCClient
-import time
+Also bump up the port so the next invocation of this goes on another port."
+  (pynt-start-ast-server)
+  (pynt-start-elisp-relay-server)
+  (pynt-start-py-epc-client)
+  (setq pynt-port (1+ pynt-port)))
 
-def __cell__(content, buffer_name, cell_type, line_number):
-    elisp_func = 'make-code-cell-and-eval'
-    epc_client.call_sync(elisp_func, args=[content, buffer_name, cell_type, line_number])
-    time.sleep(0.01)
-
-epc_client = EPCClient(('docker.for.mac.localhost', 9999), log_traceback=True)
-__name__ = '__pynt__'
-
-")
-
-(defun pynt-start-py-epc-client ()
-  "Initialize the EPC client for the active kernel.
-
-This needs to be done so python can send commands to emacs to create code cells."
-  (ein:shared-output-eval-string pynt-init-code))
+(defun pynt-reinit-auto-scroll-hook ()
+  "Try to force the hook back into working"
+  (interactive)
+  (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
+  (add-hook 'post-command-hook #'pynt-move-cell-window :local))
 
 (define-minor-mode pynt-mode
   "Toggle pynt-mode
@@ -257,9 +329,7 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
         (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-grab-ein-buffer-name)
         (add-hook 'post-command-hook #'pynt-move-cell-window :local)
         (call-interactively 'ein:connect-to-notebook-buffer)
-        (pynt-start-ast-server)
-        (pynt-start-elisp-relay-server)
-        (pynt-start-py-epc-client)
+        (pynt-init-servers)
         (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-grab-ein-buffer-name)
     (remove-hook 'post-command-hook #'pynt-move-cell-window :local)

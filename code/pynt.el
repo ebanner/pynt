@@ -183,16 +183,18 @@ This is the main function which kicks off much of the work."
 (defun pynt-move-cell-window ()
   "Scroll the worksheet buffer
 
-Do it so the cell which corresponds to the line of code the point is on goes to the top."
+Do it so the cell which corresponds to the line of code the point
+is on goes to the top. Make sure the cell we're about to jump to
+is is indeed the active buffer."
   (interactive)
   (when (not (string-prefix-p "context=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
     (save-selected-window
       (let ((window (get-buffer-window pynt-active-buffer-name))
-            (cell-location (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map))
+            (cell-marker (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map))
             (point-line (count-screen-lines (window-start) (point))))
-        (when cell-location
+        (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-buffer-name))
           (select-window window)
-          (goto-char cell-location)
+          (goto-char cell-marker)
           (recenter point-line))))))
 
 (defun pynt-create-new-worksheet (buffer-name)
@@ -230,14 +232,11 @@ EIN cells from the python EPC client."
 
 (defun pynt-make-code-cell-and-eval (expr buffer-name cell-type line-number)
   "EPC callback
-
 Pop over to the worksheet buffer `buffer-name' and insert a new
 cell or type `cell-type' containing `expr' at the bottom and
 evaluate it.
-
 This function is called from python code running in a jupyter
 kernel via RPC.
-
 `line-number' is the line number in the code that the cell
 corresponds to and is saved in the map."
   (pynt-log "Inserting: %S" expr)
@@ -257,7 +256,7 @@ corresponds to and is saved in the map."
           (progn
             (call-interactively 'ein:worksheet-execute-cell)
             (when (not (eq line-number -1))
-              (puthash line-number (ein:cell-location cell) pynt-line-number-to-cell-location-map)))
+              (puthash line-number (ein:cell-location cell :after-input) pynt-line-number-to-cell-location-map)))
         (if (string= cell-type "markdown")
             (ein:worksheet-change-cell-type ws cell "markdown")
           (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type)))))))
@@ -289,13 +288,11 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-py-epc-client ()
   "Initialize the EPC client for the active kernel.
-
 This needs to be done so python can send commands to emacs to create code cells."
   (ein:shared-output-eval-string pynt-init-code))
 
 (defun pynt-grab-ein-buffer-name (old-function buffer-or-name)
   "Advice to be added around `ein:connect-to-notebook-buffer'
-
 So pynt-mode can grab the buffer name of the main worksheet."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
   (setq pynt-main-worksheet-name buffer-or-name)
@@ -303,7 +300,6 @@ So pynt-mode can grab the buffer name of the main worksheet."
 
 (defun pynt-init-servers ()
   "Start AST and elisp relay server along with python EPC client
-
 Also bump up the port so the next invocation of this goes on another port."
   (pynt-start-ast-server)
   (pynt-start-elisp-relay-server)
@@ -311,7 +307,7 @@ Also bump up the port so the next invocation of this goes on another port."
   (setq pynt-port (1+ pynt-port)))
 
 (defun pynt-reinit-auto-scroll-hook ()
-  "Try to force the hook back into working"
+  "Force auto-scroll mode back working"
   (interactive)
   (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
   (add-hook 'post-command-hook #'pynt-move-cell-window :local))

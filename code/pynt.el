@@ -34,8 +34,8 @@
 Every invocation of `pynt-mode' increments this number so there
 can be multiple EPC client-server pairs.")
 
-(defvar pynt-init-code
-  (format "
+(defvar pynt-init-code-template
+  "
 
 %%matplotlib inline
 from epc.client import EPCClient
@@ -50,10 +50,11 @@ def __cell__(content, buffer_name, cell_type, line_number):
 
 __name__ = '__pynt__'
 
-" pynt-elisp-relay-server-hostname pynt-port)
-  "The code that gets evaluated when pynt-mode is activated.
-  Provides an interface for python code to make and execute EIN
-  cells.")
+"
+  "Template for the code that gets evaluated when you call `pynt-mode'
+
+The value of `pynt-elisp-relay-server-hostname' and `pynt-port'
+are needed to complete this template.")
 
 (defvar pynt-verbose t
   "Logging flag.
@@ -288,8 +289,14 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-py-epc-client ()
   "Initialize the EPC client for the active kernel.
-This needs to be done so python can send commands to emacs to create code cells."
-  (ein:shared-output-eval-string pynt-init-code))
+
+This needs to be done so python can send commands to emacs to
+create code cells. Use whatever the value is for
+`pynt-elisp-relay-server-hostname' and `pynt-port' to define the
+communication channels for the EPC client."
+  (let ((pynt-init-code (format pynt-init-code-template pynt-elisp-relay-server-hostname pynt-port)))
+    (ein:shared-output-eval-string pynt-init-code))
+  (setq pynt-port (1+ pynt-port)))
 
 (defun pynt-grab-ein-buffer-name (old-function buffer-or-name)
   "Advice to be added around `ein:connect-to-notebook-buffer'
@@ -303,14 +310,7 @@ So pynt-mode can grab the buffer name of the main worksheet."
 Also bump up the port so the next invocation of this goes on another port."
   (pynt-start-ast-server)
   (pynt-start-elisp-relay-server)
-  (pynt-start-py-epc-client)
-  (setq pynt-port (1+ pynt-port)))
-
-(defun pynt-reinit-auto-scroll-hook ()
-  "Force auto-scroll mode back working"
-  (interactive)
-  (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
-  (add-hook 'post-command-hook #'pynt-move-cell-window :local))
+  (pynt-start-py-epc-client))
 
 (define-minor-mode pynt-mode
   "Toggle pynt-mode
@@ -331,5 +331,14 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
     (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))
+
+(define-minor-mode pynt-scroll-mode
+  "Toggle pynt-scroll-mode
+
+Minor mode for scrolling an open EIN notebook."
+  :lighter "pynt-scroll"
+  (if pynt-scroll-mode
+      (add-hook 'post-command-hook #'pynt-move-cell-window :local)
+    (remove-hook 'post-command-hook #'pynt-move-cell-window)))
 
 (provide 'pynt)

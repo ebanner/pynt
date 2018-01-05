@@ -7,8 +7,14 @@ exist currently.
 
 import ast
 import doctest
+import random
+import string
 
 import astor
+
+
+def __random_string__():
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
 
 
 class FunctionExploder(ast.NodeTransformer):
@@ -109,8 +115,9 @@ class SyntaxRewriter(ast.NodeTransformer):
 
         """
         # p = iter(iterable)
+        var = __random_string__()
         assign_iter = ast.Assign(
-            targets=[ast.Name(id='p', ctx=ast.Store())],
+            targets=[ast.Name(id=var, ctx=ast.Store())],
             value=ast.Call(
                 func=ast.Name(id='iter', ctx=ast.Load()),
                 args=[loop.iter],
@@ -123,7 +130,7 @@ class SyntaxRewriter(ast.NodeTransformer):
             targets=[loop.target],
             value=ast.Call(
                 func=ast.Name(id='next', ctx=ast.Load()),
-                args=[ast.Name(id='p', ctx=ast.Load())],
+                args=[ast.Name(id=var, ctx=ast.Load())],
                 keywords=[]
             )
         )

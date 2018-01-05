@@ -233,11 +233,14 @@ EIN cells from the python EPC client."
 
 (defun pynt-make-code-cell-and-eval (expr buffer-name cell-type line-number)
   "EPC callback
+
 Pop over to the worksheet buffer `buffer-name' and insert a new
 cell or type `cell-type' containing `expr' at the bottom and
 evaluate it.
+
 This function is called from python code running in a jupyter
 kernel via RPC.
+
 `line-number' is the line number in the code that the cell
 corresponds to and is saved in the map."
   (pynt-log "Inserting: %S" expr)
@@ -264,7 +267,7 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
-  (setq pynt-ast-server (epc:start-epc "python" '("/Users/ebanner/.dotfiles/elisp/ast-server.py"))))
+  (setq pynt-ast-server (epc:start-epc "python" '("/Users/ebanner/Documents/pynt/code/ast-server.py"))))
 
 (defun pynt-annotate-make-cells-eval (code)
   "This server receives code and annotates it with code to call out to the elisp server."

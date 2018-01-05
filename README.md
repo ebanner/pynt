@@ -33,6 +33,7 @@ The first step is starting EIN just like you normally would. My workflow for tha
 
 ## TODO
 
+- Make pynt good enough so that using pynt to develop pynt is preferable to the alternative
 - ~~Make a screencast demonstrating the functionality~~
 - Add support for other language constructs (e.g. classes and context managers)
 - Add buffer narrowing option so one can focus on just a single cell at a time

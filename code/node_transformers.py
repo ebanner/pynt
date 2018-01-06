@@ -53,6 +53,28 @@ class FunctionExploder(ast.NodeTransformer):
     """
 
     def visit_FunctionDef(self, func):
+        """Roll out a function definition
+
+        >>> self = FunctionExploder()
+        >>> code = '''
+        ...
+        ... x
+        ... def foo(a):
+        ...     \"\"\"An example function
+        ...
+        ...     A detailed description.
+        ...
+        ...     >>> a = 5
+        ...
+        ...     \"\"\"
+        ...     b = a + 1
+        ...     return b
+        ... y
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> func = tree.body[1]
+
+        """
         [docstring], func.body = func.body[:1], func.body[1:]
 
         # docstring

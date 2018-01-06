@@ -43,7 +43,7 @@ The first step is starting EIN just like you normally would. My workflow for tha
     - [Video demonstration and commentary](https://www.youtube.com/watch?v=TgHvRcbYJ-8)
 - [CppCon 2014: Mike Acton "Data-Oriented Design and C++"](https://www.youtube.com/watch?v=rX0ItVEVjHc)
 - [GOTO 2016 • Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
-    - [Introduction to Investing and Finance - Lesson 1 by Martin Shkreli (expert spreadsheet usage)](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)
+- [Introduction to Investing and Finance - Lesson 1 by Martin Shkreli (expert spreadsheet usage)](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)
 - [Bruce Hauman](http://rigsomelight.com/)
     - [Literate interactive coding: Devcards](https://www.youtube.com/watch?v=G7Z_g2fnEDg)
     - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)

@@ -218,7 +218,7 @@ class Annotator(ast.NodeTransformer):
             func=ast.Name(id='__cell__', ctx=ast.Load()),
             args=[
                 ast.Str(s=content),
-                ast.Str(s=f'context={buffer}'),
+                ast.Str(s=f'ns={buffer}'),
                 ast.Str(s=cell_type),
                 ast.Str(s=lineno),
             ],
@@ -233,7 +233,7 @@ class Annotator(ast.NodeTransformer):
     def _annotate_nodes(self, nodes):
         """Make annotation on the nodes.
 
-        If the node has a context then don't annotate it normally.
+        If the node has a namespace then don't annotate it normally.
         Rather recursively call `visit()` on it.
 
         """

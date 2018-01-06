@@ -38,6 +38,7 @@ can be multiple EPC client-server pairs.")
   "
 
 %%matplotlib inline
+
 from epc.client import EPCClient
 import time
 
@@ -69,12 +70,12 @@ it/annotated/rolled out/whatever you want to call it. Needs to be
 the name of a python function in the current buffer or the value
 'outside' to indicate the code outside of any function.")
 
-(defvar-local pynt-active-buffer-name (format "context=%S" pynt-active-defun-name)
+(defvar-local pynt-active-buffer-name (format "ns=%S" pynt-active-defun-name)
   "The active buffer name.
 
 When you run `pynt-generate-worksheet' this is the buffer that
 will have code cells added to it and evaluated. Is always of the
-form 'context=`pynt-active-defun-name''")
+form 'ns=`pynt-active-defun-name''")
 
 (defvar-local pynt-main-worksheet-name "Untitled.ipynb"
   "Name of the connected notebook.
@@ -124,13 +125,13 @@ Do nothing if the buffer does not exist."
         ('error)))))
 
 (defun pynt-kill-all-cells ()
-  "Clear cells in every context worksheet.
+  "Clear cells in every namespace worksheet.
 
-This function mainly exists to clear out each context worksheet
+This function mainly exists to clear out each namespace worksheet
 in the beginning to start them each with a blank slate."
   (interactive)
   (let* ((buffer-names (mapcar 'buffer-name (buffer-list)))
-        (worksheet-names (seq-filter (lambda (buffer-name) (string-prefix-p "context=" buffer-name)) buffer-names)))
+        (worksheet-names (seq-filter (lambda (buffer-name) (string-prefix-p "ns=" buffer-name)) buffer-names)))
     (dolist (worksheet-name worksheet-names)
       (pynt-kill-cells worksheet-name))))
 
@@ -144,37 +145,37 @@ This function is used so we can pull out the worksheet name (i.e. name of the ac
          (buffer-names (mapcar 'buffer-name buffers)))
     buffer-names))
 
-(defun pynt-get-active-context-buffer-name ()
-  "Return the name of the active context.
+(defun pynt-get-active-ns-buffer-name ()
+  "Return the name of the active namespace.
 
-The active context will have a buffer in the active frame and
-will have the prefix 'context='."
+The active namespace will have a buffer in the active frame and
+will have the prefix 'ns='."
   (let* ((buffer-names (pynt-get-buffer-names))
          (active-buffer-singleton (seq-filter
-                                   (lambda (buffer-name) (string-prefix-p "context=" buffer-name))
+                                   (lambda (buffer-name) (string-prefix-p "ns=" buffer-name))
                                    buffer-names))
          (active-buffer-name (car active-buffer-singleton)))
     (if (not active-buffer-name)
         "N/A"
       active-buffer-name)))
 
-(defun pynt-set-active-context ()
+(defun pynt-set-active-ns ()
   "Parse through the active frame and pick out the active buffer
 
 Set `pynt-active-buffer-name' and `pynt-active-defun-name' accordingly."
-  (setq pynt-active-buffer-name (pynt-get-active-context-buffer-name))
+  (setq pynt-active-buffer-name (pynt-get-active-ns-buffer-name))
   (setq pynt-active-defun-name
         (if (not (string= pynt-active-buffer-name "N/A"))
-            (cadr (split-string pynt-active-buffer-name "context="))
+            (cadr (split-string pynt-active-buffer-name "ns="))
           "N/A")))
 
 (defun pynt-generate-worksheet ()
-  "Generate a worksheet determined by the active context
+  "Generate a worksheet determined by the active namespace
 
 This is the main function which kicks off much of the work."
   (interactive)
   (let ((code (pynt-get-buffer-string)))
-    (pynt-set-active-context)
+    (pynt-set-active-ns)
     (pynt-log "Doing code = %S" code)
     (if (string= pynt-active-buffer-name "N/A")
         (pynt-kill-all-cells)
@@ -188,7 +189,7 @@ Do it so the cell which corresponds to the line of code the point
 is on goes to the top. Make sure the cell we're about to jump to
 is is indeed the active buffer."
   (interactive)
-  (when (not (string-prefix-p "context=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
+  (when (not (string-prefix-p "ns=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
     (save-selected-window
       (let ((window (get-buffer-window pynt-active-buffer-name))
             (cell-marker (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map))

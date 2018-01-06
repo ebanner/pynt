@@ -48,10 +48,10 @@ def annotate(*code):
     >>> code = [s, 'Foo.bar']
 
     """
-    code, context = code[0], code[1]
+    code, namespace = code[0], code[1]
     tree = ast.parse(code)
     new_code = str()
-    if context == 'N/A': # just create worksheets
+    if namespace == 'N/A': # just create worksheets
         func_names = [stmt.name for stmt in tree.body if isinstance(stmt, ast.FunctionDef)]
         method_names = []
         classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]
@@ -60,32 +60,32 @@ def annotate(*code):
                 if not isinstance(expr, ast.FunctionDef):
                     continue
                 method_names.append(f'{classdef.name}.{expr.name}')
-        contexts = ['outside'] + func_names + method_names
-        buffer_names = reversed([f'context={func_name}' for func_name in contexts])
+        namespaces = ['outside'] + func_names + method_names
+        buffer_names = reversed([f'ns={func_name}' for func_name in namespaces])
         commands = [f'__cell__("pass", "{buffer_name}", "code", "-1")' for buffer_name in buffer_names]
         new_code = '\n'.join(commands)
     else:
-        if context == 'outside':
+        if namespace == 'outside':
             tree.body = [stmt for stmt in tree.body if not isinstance(stmt, ast.FunctionDef)]
-        elif '.' in context: # method
-            func_name = context.split('.')[-1]
+        elif '.' in namespace: # method
+            func_name = namespace.split('.')[-1]
             classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]
             for classdef in classdefs:
                 methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
                 for method in methods:
                     if method.name == func_name:
-                        method.name = context # rename method for readability
+                        method.name = namespace # rename method for readability
                         tree.body = [method]
                         break
         else:
-            func_name = context
+            func_name = namespace
             funcs = [stmt for stmt in tree.body if isinstance(stmt, ast.FunctionDef)]
-            tree.body = [func for func in funcs if func.name == context]
+            tree.body = [func for func in funcs if func.name == namespace]
 
         # apply transformations
         tree = FunctionExploder().visit(tree)
-        tree = SyntaxRewriter(buffer=context).visit(tree)
-        tree = Annotator(buffer=context).visit(tree)
+        tree = SyntaxRewriter(buffer=namespace).visit(tree)
+        tree = Annotator(buffer=namespace).visit(tree)
         new_code = astor.to_source(tree)
 
     return new_code

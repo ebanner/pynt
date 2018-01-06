@@ -34,12 +34,13 @@ The first step is starting EIN just like you normally would. My workflow for tha
 ## Inspirations and Related Projects
 
 - [SLIME](https://common-lisp.net/project/slime/)
+- [vim-slime](https://github.com/jpalardy/vim-slime)
+- [EIN](http://millejoh.github.io/emacs-ipython-notebook/)
 - [Bret Victor - Inventing on Principle (video)](https://vimeo.com/36579366)
     - [Tools to support live coding as in Bret Victor's “Inventing on Principle” talk (stack overflow)](https://stackoverflow.com/questions/9448215/tools-to-support-live-coding-as-in-bret-victors-inventing-on-principle-talk)
 - [Light Table - a new IDE concept](http://www.chris-granger.com/2012/04/12/light-table-a-new-ide-concept/)
     - [EmacsWiki: Light Table](https://www.emacswiki.org/emacs/LightTable)
     - [Video demonstration and commentary](https://www.youtube.com/watch?v=TgHvRcbYJ-8)
-- [EIN](http://millejoh.github.io/emacs-ipython-notebook/)
 - [CppCon 2014: Mike Acton "Data-Oriented Design and C++"](https://www.youtube.com/watch?v=rX0ItVEVjHc)
 - [GOTO 2016 • Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
     - [Introduction to Investing and Finance - Lesson 1 by Martin Shkreli (expert spreadsheet usage)](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)

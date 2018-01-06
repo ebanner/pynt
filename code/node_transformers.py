@@ -119,7 +119,8 @@ class SyntaxRewriter(ast.NodeTransformer):
         self.buffer = buffer
 
     def visit_For(self, loop):
-        """
+        """Rewrite for loops as while loops
+
         for i in iterable:
             <body>
 
@@ -133,9 +134,23 @@ class SyntaxRewriter(ast.NodeTransformer):
                 break
             <body>
 
-        TODO: Choose a random legal variable name to replace hard-coded `p`.
+        >>> self = SyntaxRewriter(buffer='foo')
+        >>> code = '''
+        ...
+        ... x
+        ... for i in range(2):
+        ...     for j in range(2):
+        ...         k = i + j
+        ...         print(k)
+        ... y
+        ...
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> loop = tree.body[1]
 
         """
+        loop = self.generic_visit(loop)
+
         # p = iter(iterable)
         var = __random_string__()
         assign_iter = ast.Assign(

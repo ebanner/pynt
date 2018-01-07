@@ -206,22 +206,37 @@ This is the main function which kicks off much of the work."
   (let ((code (pynt-get-buffer-string)))
     (pynt-annotate-make-cells-eval code)))
 
-(defun pynt-move-cell-window ()
+(defun pynt-scroll-cell-window ()
   "Scroll the worksheet buffer
 
 Do it so the cell which corresponds to the line of code the point
 is on goes to the top. Make sure the cell we're about to jump to
-is is indeed the active buffer."
+is is indeed the active buffer.
+
+Go off of the variable `pynt-nth-cell-instance' in the case where
+we want to see the nth pass though, say, a for loop."
   (interactive)
   (when (not (string-prefix-p "ns=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
     (save-selected-window
       (let ((window (get-buffer-window pynt-active-namespace-buffer-name))
-            (cell-marker (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map))
+            (cell-marker (nth pynt-nth-cell-instance (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map)))
             (point-line (count-screen-lines (window-start) (point))))
         (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
           (select-window window)
           (goto-char cell-marker)
           (recenter point-line))))))
+
+(defun pynt-prev-cell-instance ()
+  (interactive)
+  (setq pynt-nth-cell-instance (1- pynt-nth-cell-instance))
+  (pynt-scroll-cell-window)
+  (message "iteration # = %s" pynt-nth-cell-instance))
+
+(defun pynt-next-cell-instance ()
+  (interactive)
+  (setq pynt-nth-cell-instance (1+ pynt-nth-cell-instance))
+  (pynt-scroll-cell-window)
+  (message "iteration # = %s" pynt-nth-cell-instance))
 
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in a notebook who has a buffer called *epc-client*"
@@ -281,14 +296,13 @@ corresponds to and is saved in the map."
     (insert expr)
     (let ((cell (ein:get-cell-at-point))
           (ws (ein:worksheet--get-ws-or-error)))
-      (if (string= cell-type "code")
-          (progn
-            (call-interactively 'ein:worksheet-execute-cell)
-            (when (not (eq line-number -1))
-              (puthash line-number (ein:cell-location cell :after-input) pynt-line-number-to-cell-location-map)))
-        (if (string= cell-type "markdown")
-            (ein:worksheet-change-cell-type ws cell "markdown")
-          (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type)))))))
+      (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
+            ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
+            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
+      (when (not (eq line-number -1))
+        (let ((previous-cell-locations (gethash line-number pynt-line-number-to-cell-location-map))
+              (new-cell-location (ein:cell-location cell :after-input)))
+          (puthash line-number (append previous-cell-locations (list new-cell-location)) pynt-line-number-to-cell-location-map))))))
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
@@ -351,13 +365,11 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
   (if pynt-mode
       (progn
         (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
-        (add-hook 'post-command-hook #'pynt-move-cell-window :local)
         (call-interactively 'ein:connect-to-notebook-buffer)
         (pynt-init-servers)
         (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
         (setq-local pynt-module-level-namespace (pynt-get-module-level-namespace)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
-    (remove-hook 'post-command-hook #'pynt-move-cell-window :local)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))
 
@@ -366,8 +378,14 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
 
 Minor mode for scrolling an open EIN notebook."
   :lighter "pynt-scroll"
+  :keymap (let ((map (make-sparse-keymap)))
+            (define-key map (kbd "C-c C-n") 'pynt-next-cell-instance)
+            (define-key map (kbd "C-c C-p") 'pynt-prev-cell-instance)
+            map)
   (if pynt-scroll-mode
-      (add-hook 'post-command-hook #'pynt-move-cell-window :local)
-    (remove-hook 'post-command-hook #'pynt-move-cell-window)))
+      (progn
+        (add-hook 'post-command-hook #'pynt-scroll-cell-window :local))
+    (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
+  (setq pynt-nth-cell-instance 0))
 
 (provide 'pynt)

@@ -47,6 +47,28 @@ def annotate(*code):
     ... x
     ...
     ... '''
+    >>> s = '''
+    ...
+    ... x
+    ... class Foo:
+    ...     def bar():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def biz():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...
+    ... class Qux:
+    ...     def quux():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def quuux():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ... y
+    ...
+    ... '''
+    >>> code = [s, 'ast-server']
     >>> code = [s, 'Foo.bar']
     >>> s = '''
     ...
@@ -70,28 +92,6 @@ def annotate(*code):
     ...
     ... '''
     >>> code = [s, '*ast-server*']
-    >>> s = '''
-    ...
-    ... x
-    ... class Foo:
-    ...     def bar():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def biz():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...
-    ... class Qux:
-    ...     def quux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def quuux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ... y
-    ...
-    ... '''
-    >>> code = [s, 'ast-server']
 
     """
     code, namespace = code[0], code[1]

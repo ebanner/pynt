@@ -16,6 +16,9 @@ import astor
 def __random_string__():
     return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
 
+def upcase(s):
+    return f'{s[0].upper()}{s[1:]}'
+
 
 class FunctionExploder(ast.NodeTransformer):
     """Exposes the body of a function to the next scope up
@@ -51,11 +54,14 @@ class FunctionExploder(ast.NodeTransformer):
     TODO: Handle `return`s better.
 
     """
+    def __init__(self, buffer):
+        super(__class__, self).__init__()
+        self.buffer = buffer
 
     def visit_FunctionDef(self, func):
         """Roll out a function definition
 
-        >>> self = FunctionExploder()
+        >>> self = FunctionExploder(buffer='bar')
         >>> code = '''
         ...
         ... x
@@ -90,18 +96,18 @@ class FunctionExploder(ast.NodeTransformer):
         exprs = []
         exprs.append(
             Annotator.make_annotation(
-                buffer=func.name,
-                content=' '.join(substring.capitalize() for substring in func.name.split('_')),
+                buffer=self.buffer,
+                content=' -> '.join(' '.join(upcase(t) for t in id.split('_')) for id in func.name.split('.')),
                 cell_type='1',
                 lineno=func.lineno
             )
         )
-        exprs.append(Annotator.make_annotation(buffer=func.name, content=docstring_prefix, cell_type='markdown'))
-        exprs.append(Annotator.make_annotation(buffer=func.name, content='Example Input', cell_type='1'))
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Example Input', cell_type='1'))
         for assign_expr in assign_exprs:
             tree = ast.parse(assign_expr)
             exprs.append(tree.body[0])
-        exprs.append(Annotator.make_annotation(buffer=func.name, content='Body of Function', cell_type='1'))
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body of Function', cell_type='1'))
         for stmt in func.body:
             exprs.append(stmt)
 
@@ -347,7 +353,7 @@ if __name__ == '__main__':
 
     '''
     tree = ast.parse(code)
-    tree = FunctionExploder().visit(tree)
+    tree = FunctionExploder(buffer='bar').visit(tree)
     code = astor.to_source(tree)
     print(code)
 
@@ -379,7 +385,7 @@ if __name__ == '__main__':
 
     '''
     tree = ast.parse(code)
-    tree = FunctionExploder().visit(tree)
+    tree = FunctionExploder(buffer='bar').visit(tree)
     code = astor.to_source(tree)
     print(code)
     tree = SyntaxRewriter(buffer='outside').visit(tree)
@@ -396,7 +402,7 @@ if __name__ == '__main__':
 
     '''
     tree = ast.parse(code)
-    tree = FunctionExploder().visit(tree)
+    tree = FunctionExploder(buffer=bar).visit(tree)
     code = astor.to_source(tree)
     print(code)
     tree = ast.parse(code)

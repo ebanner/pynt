@@ -42,7 +42,7 @@ can be multiple EPC client-server pairs.")
 from epc.client import EPCClient
 import time
 
-epc_client = EPCClient((%S, %S), log_traceback=True)
+epc_client = EPCClient(('%s', %s), log_traceback=True)
 
 def __cell__(content, buffer_name, cell_type, line_number):
     elisp_func = 'make-code-cell-and-eval'
@@ -90,17 +90,23 @@ This variable holds the name of the notebook associated with the
 current `pynt-mode' session. The value gets set when you can
 `pynt-mode' and choose a EIN notebook name.'")
 
-(defvar-local pynt-line-number-to-cell-location-map (make-hash-table :test 'equal)
-  "Table mapping of source code lines to EIN cells.
+(defvar-local pynt-line-to-cell-map nil
+  "Table mapping of source code line to EIN cell(s)
 
-This table is used to scroll the EIN buffer along with the code buffer.")
+A source code line may be associated with many EIN cells (e.g. a
+line in the body of a for loop.")
+
+(defvar-local pynt-cell-to-line-map nil
+  "Table mapping of EIN cell to code line.
+
+A EIN cell is only ever associated with a single code line.")
 
 (defvar-local pynt-elisp-relay-server nil "Elisp relay server")
 (defvar-local pynt-ast-server nil "Python AST server")
 
 ;;; Set these variables to accomodate EIN recursive data structures
-(setq-local print-level 2)
-(setq-local print-length 10)
+(setq-local print-level 0)
+(setq-local print-length 1)
 (setq-local print-circle t)
 
 (defun pynt-get-module-level-namespace ()
@@ -203,6 +209,8 @@ This is the main function which kicks off much of the work."
   (interactive)
   (pynt-set-active-ns (pynt-get-active-ns-buffer-name))
   (pynt-kill-cells pynt-active-namespace-buffer-name)
+  (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
+  (setq pynt-cell-to-line-map (make-hash-table :test 'equal))
   (let ((code (pynt-get-buffer-string)))
     (pynt-annotate-make-cells-eval code)))
 
@@ -217,14 +225,20 @@ Go off of the variable `pynt-nth-cell-instance' in the case where
 we want to see the nth pass though, say, a for loop."
   (interactive)
   (when (not (string-prefix-p "ns=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
+    (pynt-log "buffer name = %s" (buffer-name))
     (save-selected-window
-      (let ((window (get-buffer-window pynt-active-namespace-buffer-name))
-            (cell-marker (nth pynt-nth-cell-instance (gethash (line-number-at-pos) pynt-line-number-to-cell-location-map)))
-            (point-line (count-screen-lines (window-start) (point))))
-        (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
-          (select-window window)
-          (goto-char cell-marker)
-          (recenter point-line))))))
+      (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
+        (pynt-log "length of cells = %S" (length cells))
+        (when cells
+          (let* ((cell (nth pynt-nth-cell-instance cells))
+                 (cell-marker (ein:cell-location cell :after-input))
+                 (point-line (count-screen-lines (window-start) (point)))
+                 (window (get-buffer-window pynt-active-namespace-buffer-name)))
+            (pynt-log "got past let*!")
+            (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
+              (select-window window)
+              (goto-char cell-marker)
+              (recenter point-line))))))))
 
 (defun pynt-prev-cell-instance ()
   (interactive)
@@ -283,26 +297,30 @@ kernel via RPC.
 
 `line-number' is the line number in the code that the cell
 corresponds to and is saved in the map."
-  (pynt-log "Inserting: %S" expr)
+  (pynt-log "Inserting %S" expr)
   (pynt-log "line-number = %S" line-number)
 
   (when (not (get-buffer buffer-name))
     (pynt-create-new-worksheet buffer-name)
     (pynt-kill-cells buffer-name))
 
-  (with-current-buffer buffer-name
-    (end-of-buffer)
-    (call-interactively 'ein:worksheet-insert-cell-below)
-    (insert expr)
-    (let ((cell (ein:get-cell-at-point))
-          (ws (ein:worksheet--get-ws-or-error)))
-      (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
-            ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
-            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
-      (when (not (eq line-number -1))
-        (let ((previous-cell-locations (gethash line-number pynt-line-number-to-cell-location-map))
-              (new-cell-location (ein:cell-location cell :after-input)))
-          (puthash line-number (append previous-cell-locations (list new-cell-location)) pynt-line-number-to-cell-location-map))))))
+  ;; These variables are buffer local so we need to grab them before switching
+  ;; over to the worksheet buffer.
+  (let ((line-to-cell-map pynt-line-to-cell-map)
+        (cell-to-line-map pynt-cell-to-line-map))
+    (with-current-buffer buffer-name
+      (end-of-buffer)
+      (call-interactively 'ein:worksheet-insert-cell-below)
+      (insert expr)
+      (let ((cell (ein:get-cell-at-point))
+            (ws (ein:worksheet--get-ws-or-error)))
+        (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
+              ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
+              (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
+        (when (not (eq line-number -1))
+          (let ((previous-cells (gethash line-number line-to-cell-map)))
+            (puthash line-number (append previous-cells (list cell)) line-to-cell-map)
+            (puthash cell line-number cell-to-line-map)))))))
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
@@ -311,13 +329,11 @@ corresponds to and is saved in the map."
 (defun pynt-annotate-make-cells-eval (code)
   "This server receives code and annotates it with code to call out to the elisp server."
   (deferred:$
-    (pynt-log "Calling python AST server...")
-    (pynt-log "with code = %S" code)
-    (pynt-log "and active defun = %S" pynt-active-namespace)
+    (pynt-log "Calling python AST server with active namespace = %s ..." pynt-active-namespace)
     (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-active-namespace))
     (deferred:nextc it
       (lambda (annotated-code)
-        (pynt-log "Annotated code: %S" annotated-code)
+        (pynt-log "Annotated code = %S" annotated-code)
         (ein:shared-output-eval-string annotated-code)))
     (deferred:error it
       (lambda (err)
@@ -368,7 +384,9 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
         (call-interactively 'ein:connect-to-notebook-buffer)
         (pynt-init-servers)
         (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
-        (setq-local pynt-module-level-namespace (pynt-get-module-level-namespace)))
+        (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
+        (setq-local pynt-line-to-cell-map (make-hash-table :test 'equal))
+        (setq-local pynt-cell-to-line-map (make-hash-table :test 'equal)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))

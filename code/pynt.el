@@ -28,6 +28,10 @@
   mac."
   :options '("localhost" "docker.for.mac.localhost"))
 
+(defcustom pynt-scroll-narrow-view t
+  "Narrow the notebook buffer if t and don't otherwise"
+  :options '(nil t))
+
 (defvar pynt-epc-port 9999
   "The port that the current EPC client and server are communicating on.
 
@@ -229,13 +233,23 @@ don't want to worry about at this point in time."
         (when cells
           (condition-case exception
               (let* ((cell (nth pynt-nth-cell-instance cells))
-                     (cell-marker (ein:cell-location cell :after-input))
+                     (cell-marker (ein:cell-location cell :input))
                      (point-line (count-screen-lines (window-start) (point)))
                      (window (get-buffer-window pynt-active-namespace-buffer-name)))
                 (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
                   (select-window window)
+                  (widen)
                   (goto-char cell-marker)
-                  (recenter point-line)))
+                  (recenter point-line)
+                  (when pynt-scroll-narrow-view
+                    (beginning-of-line)
+                    (previous-line)
+                    (call-interactively 'set-mark-command)
+                    (call-interactively 'ein:worksheet-goto-next-input)
+                    (call-interactively 'ein:worksheet-goto-next-input)
+                    (previous-line)
+                    (call-interactively 'narrow-to-region)
+                    (beginning-of-buffer))))
             ('error)))))))
 
 (defun pynt-prev-cell-instance ()

@@ -90,16 +90,11 @@ This variable holds the name of the notebook associated with the
 current `pynt-mode' session. The value gets set when you can
 `pynt-mode' and choose a EIN notebook name.'")
 
-(defvar-local pynt-line-to-cell-map nil
+(defvar pynt-line-to-cell-map nil
   "Table mapping of source code line to EIN cell(s)
 
 A source code line may be associated with many EIN cells (e.g. a
 line in the body of a for loop.")
-
-(defvar-local pynt-cell-to-line-map nil
-  "Table mapping of EIN cell to code line.
-
-A EIN cell is only ever associated with a single code line.")
 
 (defvar-local pynt-elisp-relay-server nil "Elisp relay server")
 (defvar-local pynt-ast-server nil "Python AST server")
@@ -210,7 +205,6 @@ This is the main function which kicks off much of the work."
   (pynt-set-active-ns (pynt-get-active-ns-buffer-name))
   (pynt-kill-cells pynt-active-namespace-buffer-name)
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
-  (setq pynt-cell-to-line-map (make-hash-table :test 'equal))
   (let ((code (pynt-get-buffer-string)))
     (pynt-annotate-make-cells-eval code)))
 
@@ -222,23 +216,27 @@ is on goes to the top. Make sure the cell we're about to jump to
 is is indeed the active buffer.
 
 Go off of the variable `pynt-nth-cell-instance' in the case where
-we want to see the nth pass though, say, a for loop."
+we want to see the nth pass though, say, a for loop.
+
+Wrap the main logic in a condition case because it could be the
+case that the cell that did correspond to a line has since been
+deleted. Basically there is a bunch of data invalidation that I
+don't want to worry about at this point in time."
   (interactive)
-  (when (not (string-prefix-p "ns=" (buffer-name))) ; this should NOT be necessary because the hook should be *local*
-    (pynt-log "buffer name = %s" (buffer-name))
+  (when (not (string-prefix-p "ns=" (buffer-name)))
     (save-selected-window
       (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
-        (pynt-log "length of cells = %S" (length cells))
         (when cells
-          (let* ((cell (nth pynt-nth-cell-instance cells))
-                 (cell-marker (ein:cell-location cell :after-input))
-                 (point-line (count-screen-lines (window-start) (point)))
-                 (window (get-buffer-window pynt-active-namespace-buffer-name)))
-            (pynt-log "got past let*!")
-            (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
-              (select-window window)
-              (goto-char cell-marker)
-              (recenter point-line))))))))
+          (condition-case exception
+              (let* ((cell (nth pynt-nth-cell-instance cells))
+                     (cell-marker (ein:cell-location cell :after-input))
+                     (point-line (count-screen-lines (window-start) (point)))
+                     (window (get-buffer-window pynt-active-namespace-buffer-name)))
+                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
+                  (select-window window)
+                  (goto-char cell-marker)
+                  (recenter point-line)))
+            ('error)))))))
 
 (defun pynt-prev-cell-instance ()
   (interactive)
@@ -306,21 +304,18 @@ corresponds to and is saved in the map."
 
   ;; These variables are buffer local so we need to grab them before switching
   ;; over to the worksheet buffer.
-  (let ((line-to-cell-map pynt-line-to-cell-map)
-        (cell-to-line-map pynt-cell-to-line-map))
-    (with-current-buffer buffer-name
-      (end-of-buffer)
-      (call-interactively 'ein:worksheet-insert-cell-below)
-      (insert expr)
-      (let ((cell (ein:get-cell-at-point))
-            (ws (ein:worksheet--get-ws-or-error)))
-        (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
-              ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
-              (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
-        (when (not (eq line-number -1))
-          (let ((previous-cells (gethash line-number line-to-cell-map)))
-            (puthash line-number (append previous-cells (list cell)) line-to-cell-map)
-            (puthash cell line-number cell-to-line-map)))))))
+  (with-current-buffer buffer-name
+    (end-of-buffer)
+    (call-interactively 'ein:worksheet-insert-cell-below)
+    (insert expr)
+    (let ((cell (ein:get-cell-at-point))
+          (ws (ein:worksheet--get-ws-or-error)))
+      (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
+            ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
+            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
+      (when (and (not (eq line-number -1)) pynt-line-to-cell-map) ; not sure why maps would be nil but it happens ¯\_(ツ)_/¯
+        (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
+          (puthash line-number (append previous-cells (list cell)) pynt-line-to-cell-map))))))
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
@@ -374,9 +369,10 @@ So pynt-mode can grab the buffer name of the main worksheet."
   "Toggle pynt-mode
 
 Minor mode for generating and interacting with jupyter notebooks via EIN"
-  :lighter " pynt"
+  :lighter " pynt "
   :keymap (let ((map (make-sparse-keymap)))
-            (define-key map (kbd "C-c C-c") 'pynt-execute-namespace)
+            (define-key map (kbd "C-c C-e") 'pynt-execute-namespace)
+            (define-key map (kbd "C-c C-g") 'pynt-generate-namespace-worksheets)
             map)
   (if pynt-mode
       (progn
@@ -385,8 +381,7 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
         (pynt-init-servers)
         (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
         (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
-        (setq-local pynt-line-to-cell-map (make-hash-table :test 'equal))
-        (setq-local pynt-cell-to-line-map (make-hash-table :test 'equal)))
+        (setq pynt-buffer-name (buffer-name)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))
@@ -395,7 +390,7 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
   "Toggle pynt-scroll-mode
 
 Minor mode for scrolling an open EIN notebook."
-  :lighter "pynt-scroll"
+  :lighter " pynt-scroll "
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c C-n") 'pynt-next-cell-instance)
             (define-key map (kbd "C-c C-p") 'pynt-prev-cell-instance)

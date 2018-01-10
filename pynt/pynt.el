@@ -335,7 +335,7 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
-  (setq pynt-ast-server (epc:start-epc "python" '("/Users/ebanner/Documents/pynt/pynt/ast-server.py"))))
+  (setq pynt-ast-server (epc:start-epc "python" '("./ast-server.py"))))
 
 (defun pynt-annotate-make-cells-eval (code)
   "This server receives code and annotates it with code to call out to the elisp server."

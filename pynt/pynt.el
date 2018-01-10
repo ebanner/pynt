@@ -1,24 +1,26 @@
-;;; pynt.el --- Generate and interact with jupyter notebooks with EIN
+;;; pynt.el --- Interact with jupyter notebooks
 
 ;; Copyright (C) 2018 Free Software Foundation, Inc.
 
 ;; Author: Edward Banner <edward.banner@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((flange "1.0"))
-;; Keywords: jupyter, ein, interactive, python
+;; Package-Requires: ((emacs "24.4"))
+;; Keywords: convenience
 ;; URL: https://github.com/ebanner/pynt
 
 ;;; Commentary:
 
-;; This package provides a minor mode to generate and interact with jupyter
-;; notebooks via EIN from a Python script.
+;; pynt provides a minor mode `pynt-mode' to generate and interact with jupyter
+;; notebooks via EIN from code in a python buffer.
 
 ;;; Dependencies
 (require 'cl)
 (require 'epcs)
 (require 'epc)
 
-(defgroup pynt nil "The customization group for PYthon iNTeractive")
+(defgroup pynt nil
+  "Customization group for pynt."
+  :group 'applications)
 
 ;;; Variables
 (defcustom pynt-elisp-relay-server-hostname "localhost"
@@ -333,7 +335,7 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
-  (setq pynt-ast-server (epc:start-epc "python" '("/Users/ebanner/Documents/pynt/code/ast-server.py"))))
+  (setq pynt-ast-server (epc:start-epc "python" '("/Users/ebanner/Documents/pynt/pynt/ast-server.py"))))
 
 (defun pynt-annotate-make-cells-eval (code)
   "This server receives code and annotates it with code to call out to the elisp server."
@@ -386,7 +388,7 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
   :lighter " pynt "
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c C-e") 'pynt-execute-namespace)
-            (define-key map (kbd "C-c C-g") 'pynt-generate-namespace-worksheets)
+            (define-key map (kbd "C-c C-w") 'pynt-generate-namespace-worksheets)
             map)
   (if pynt-mode
       (progn
@@ -417,3 +419,5 @@ Minor mode for scrolling an open EIN notebook."
   (setq pynt-nth-cell-instance 0))
 
 (provide 'pynt)
+
+;;; pynt.el ends here

@@ -63,7 +63,7 @@ __name__ = '__pynt__'
 The value of `pynt-elisp-relay-server-hostname' and `pynt-epc-port'
 are needed to complete this template.")
 
-(defvar pynt-verbose t
+(defvar pynt-verbose nil
   "Logging flag.
 
 Log `pynt-mode' debugging information if `t' and do not otherwise.")
@@ -335,7 +335,9 @@ corresponds to and is saved in the map."
 
 (defun pynt-start-ast-server ()
   "Start python AST server"
-  (setq pynt-ast-server (epc:start-epc "python" '("./ast-server.py"))))
+  (let* ((dirname (file-name-directory (symbol-file 'pynt-log)))
+         (ast-server-path (concat dirname "ast-server.py")))
+    (setq pynt-ast-server (epc:start-epc "python" `(,ast-server-path)))))
 
 (defun pynt-annotate-make-cells-eval (code)
   "This server receives code and annotates it with code to call out to the elisp server."

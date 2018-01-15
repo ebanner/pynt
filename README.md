@@ -1,35 +1,43 @@
 # PYNT (PYthon iNTeractive)
 
-Emacs package for generating and interacting with a jupyter notebooks from existing code.
+Emacs package for generating and interacting with a jupyter notebooks from existing code via [Emacs IPython Notebook](http://millejoh.github.io/emacs-ipython-notebook/).
 
-## Demonstration
+## Getting Started
 
-[![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")
+These instructions will get you a copy of the project up and running on your local machine.
 
-## Prerequisites
+### Prerequisites
 
-- Emacs
-- jupyter (python)
-- EIN [[1]](http://millejoh.github.io/emacs-ipython-notebook/) and [[2]](https://github.com/millejoh/emacs-ipython-notebook)
-- epc (python)
+In addition to installing `pynt.el` you must install the `jupyter` and `epc` python packages. You should be able to do a
 
-## Installation
+```shell
+pip install --user jupyter epc
+```
+
+### Installing
 
 1. Clone this repo to `/your/local/path/pynt`
 2. Add `(load-file "/your/local/path/pynt/code/pynt.el")` to your `.emacs` file
 
+*Coming Soon: I am [in the process](https://github.com/melpa/melpa/pull/5240) of making this package available through MELPA!*
+
 ## Using pynt
 
-The first step is starting EIN just like you normally would. My workflow for that is the following.
+pynt is very much set up currently to augment and streamline your work with [Emacs IPython Notebook](http://millejoh.github.io/emacs-ipython-notebook/). To get the most out of it, I would recommend developing a basic proficiency with that tool.
 
-1. `M-x ein:notebooklist-login RET 8888 RET my-secret-password RET`
-2. `M-x ein:notebooklist-open RET 8888`
-3. Create a new notebook or choose an existing one (e.g. `*ein: http://127.0.0.1:8888/Untitled.ipynb*`
-4. Pull up your code side-by-side with the worksheet
-5. `M-x pynt-mode RET` to activate pynt-mode and select the notebook you chose in step 3
-6. `M-x pynt-generate-worksheet RET` to create blank worksheets for each function and "outside" context
-7. Switch to context buffer you want to inspect (i.e. `context=foo` buffer for a function `foo`)
-8. `M-x pynt-generate-worksheet RET` to generate a worksheet for this function
+Once you feel comfortable using EIN, here are some steps to get setup and start using EIN:
+
+1. `M-x ein:jupyter-server-start RET`
+2. Create a new notebook by moving your point over to **[New Notebook]** and hitting `RET`
+3. Do `M-x pynt-mode RET` in your code window
+4. Click on the namespace you are interested in interacting with with either the mouse or with `ein:notebook-worksheet-open-1th`
+5. Hit `C-c C-e` to do `pynt-execute-namespace` to generate a jupyter notebook
+6. Optionally run `M-x pynt-scroll-mode RET` to enable scrolling mode to line up your code with the generated notebook
+
+## Video Demo
+
+[![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")
+
 
 ## Inspirations and Related Projects
 

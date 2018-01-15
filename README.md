@@ -49,19 +49,21 @@ Once you feel comfortable using EIN, here are some steps to get setup and start 
 [![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")
 
 
-## Inspirations and Related Projects
+## Inspirations
+
+There are a lot of inspiring and exciting interactive programming projects out there. Here are a few related talks and projects that I found inspiring.
 
 - [SLIME](https://common-lisp.net/project/slime/)
 - [vim-slime](https://github.com/jpalardy/vim-slime)
 - [EIN](http://millejoh.github.io/emacs-ipython-notebook/)
-- [Bret Victor - Inventing on Principle (video)](https://vimeo.com/36579366)
-    - [Tools to support live coding as in Bret Victor's “Inventing on Principle” talk](https://stackoverflow.com/questions/9448215/tools-to-support-live-coding-as-in-bret-victors-inventing-on-principle-talk)  (stack overflow)
 - [Light Table - a new IDE concept](http://www.chris-granger.com/2012/04/12/light-table-a-new-ide-concept/)
     - [EmacsWiki: Light Table](https://www.emacswiki.org/emacs/LightTable)
     - [Video demonstration and commentary](https://www.youtube.com/watch?v=TgHvRcbYJ-8)
 - [CppCon 2014: Mike Acton "Data-Oriented Design and C++"](https://www.youtube.com/watch?v=rX0ItVEVjHc)
-- [GOTO 2016 • Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
 - [Introduction to Investing and Finance - Lesson 1 by Martin Shkreli](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)  (expert spreadsheet usage)
+- [GOTO 2016 • Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
+- [Bret Victor - Inventing on Principle (video)](https://vimeo.com/36579366)
+    - [Tools to support live coding as in Bret Victor's “Inventing on Principle” talk](https://stackoverflow.com/questions/9448215/tools-to-support-live-coding-as-in-bret-victors-inventing-on-principle-talk)  (stack overflow)
 - [Bruce Hauman](http://rigsomelight.com/)
     - [Literate interactive coding: Devcards](https://www.youtube.com/watch?v=G7Z_g2fnEDg)
     - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)

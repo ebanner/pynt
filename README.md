@@ -4,7 +4,7 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine.
+These instructions will get you a copy of pynt up and running on your local machine.
 
 ### Prerequisites
 
@@ -47,7 +47,6 @@ Once you feel comfortable using EIN, here are some steps to get setup and start 
 ## Video Demo
 
 [![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")
-
 
 ## Inspirations
 

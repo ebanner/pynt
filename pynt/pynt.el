@@ -1,4 +1,4 @@
-;;; pynt.el --- Interact with jupyter notebooks
+;;; pynt.el --- Interactive python programming with jupyter notebooks
 
 ;; Copyright (C) 2018 Free Software Foundation, Inc.
 

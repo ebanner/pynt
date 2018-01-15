@@ -1,4 +1,4 @@
-;;; pynt.el --- Interactive python programming with jupyter notebooks
+;;; pynt.el --- Generate jupyter notebooks from python via EIN
 
 ;; Copyright (C) 2018 Free Software Foundation, Inc.
 

@@ -14,6 +14,16 @@ In addition to installing `pynt.el` you must install the `jupyter` and `epc` pyt
 pip install --user jupyter epc
 ```
 
+I prefer [Anaconda](https://anaconda.org/anaconda/python) for install python packages. After downloading and installing anaconda, you should create an environment and then install those two packages i.e.
+
+```shell
+conda create -n python3.6 python=3.6
+source activate python3.6
+conda install jupyter epc
+```
+
+You can also swap out `pip` for `conda` in the last command.
+
 ### Installing
 
 1. Clone this repo to `/your/local/path/pynt`

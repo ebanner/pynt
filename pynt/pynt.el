@@ -15,6 +15,7 @@
 
 ;;; Code:
 
+(require 'ein-jupyter)
 (require 'cl)
 (require 'epcs)
 (require 'epc)
@@ -130,8 +131,10 @@ that pynt uses."
 (defun pynt-get-buffer-string ()
   "Get the entire buffer as a string."
   (save-excursion
-    (end-of-buffer)
-    (buffer-substring-no-properties 1 (point))))
+    (save-window-excursion
+      (progn
+        (end-of-buffer)
+        (buffer-substring-no-properties 1 (point))))))
 
 (defun pynt-log (&rest args)
   "Log the message when the variable `pynt-verbose' is `t.
@@ -164,7 +167,7 @@ in the beginning to start them each with a blank slate."
     (dolist (worksheet-name worksheet-names)
       (pynt-kill-cells worksheet-name))))
 
-(defun pynt-get-namespace-buffer-names ()
+(defun pynt-get-buffer-names-in-frame ()
   "Get the buffer names in the active frame.
 
 This function is used so we can pull out the worksheet name (i.e. name of the active function) to pass to the AST server"
@@ -180,7 +183,7 @@ This function is used so we can pull out the worksheet name (i.e. name of the ac
 The active namespace will have a buffer in the active frame and
 will have the prefix 'ns='. If there is no such window then
 produce an error."
-  (let* ((buffer-names (pynt-get-namespace-buffer-names))
+  (let* ((buffer-names (pynt-get-buffer-names-in-frame))
          (active-buffer-singleton (seq-filter
                                    (lambda (buffer-name) (string-prefix-p "ns=" buffer-name))
                                    buffer-names))
@@ -277,6 +280,18 @@ lines of code and executed many times."
   (setq pynt-nth-cell-instance (1+ pynt-nth-cell-instance))
   (pynt-scroll-cell-window)
   (message "iteration # = %s" pynt-nth-cell-instance))
+
+(defun pynt-new-notebook ()
+  "Create a new EIN notebook and bring it up side-by-side."
+  (interactive)
+  (let* ((path (buffer-file-name))
+         (dir-path (substring (file-name-directory path) 0 -1))
+         (home-dir (concat (expand-file-name "~") "/"))
+         (nb-dir (replace-regexp-in-string home-dir "" dir-path))
+         (url-or-port (car (ein:jupyter-server-conn-info)))
+         (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
+    (with-current-buffer notebook-list-buffer-name
+      (ein:notebooklist-new-notebook url-or-port nil nb-dir))))
 
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in the `pynt-module-level-namespace' notebook.
@@ -416,32 +431,62 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
             map)
   (if pynt-mode
       (progn
-        (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
-        (call-interactively 'ein:connect-to-notebook-buffer)
+        (save-selected-window
+          (pynt-new-notebook)
+          (sit-for 1))
+        ;; (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
+        ;; (call-interactively 'ein:connect-to-notebook-buffer)
+        (let* ((buffer-names (pynt-get-buffer-names-in-frame))
+               (buffer-names-singleton (seq-filter (lambda (buffer-name) (string-prefix-p "*ein:" buffer-name)) buffer-names)))
+          (setq pynt-notebook-buffer-name (car buffer-names-singleton))
+          (ein:connect-to-notebook-buffer pynt-notebook-buffer-name))
+        (sit-for 1)
         (pynt-init-servers)
         (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
         (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
         (setq pynt-buffer-name (buffer-name))
         (pynt-generate-namespace-worksheets))
-    (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+    ;; (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))
 
-(define-minor-mode pynt-scroll-mode
-  "Toggle pynt-scroll-mode
+(defvar pynt-scroll-mode-map (make-sparse-keymap))
+(let ((map pynt-scroll-mode-map))
+  (define-key map (kbd "<up>") 'pynt-next-cell-instance)
+  (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
+  map)
 
-Minor mode for scrolling an open EIN notebook."
+(define-minor-mode pynt-scroll-mode
+  "Minor mode for scrolling a EIN notebook side-by-side with code.
+
+\\{pynt-scroll-mode-map}"
   :lighter " pynt-scroll "
-  :keymap (let ((map (make-sparse-keymap)))
-            (define-key map (kbd "C-c C-n") 'pynt-next-cell-instance)
-            (define-key map (kbd "C-c C-p") 'pynt-prev-cell-instance)
-            map)
+  :keymap pynt-scroll-mode-map
   (if pynt-scroll-mode
       (progn
         (add-hook 'post-command-hook #'pynt-scroll-cell-window :local))
     (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
   (setq pynt-nth-cell-instance 0))
 
-(provide 'pynt)
+;;; Start a jupyter notebook server in the user's home directory
+(deferred:$
+  (deferred:next
+    (lambda ()
+      (message "Starting jupyter notebook server...")
+      (let ((server-cmd-path (executable-find "jupyter"))
+            (notebook-directory (expand-file-name "~")))
+        (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
+      (deferred:wait 6000)))
+  (deferred:nextc it
+    (lambda ()
+      (ein:force-ipython-version-check)
+      (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+        (ein:notebooklist-login url-or-port token))
+      (deferred:wait 1000)))
+  (deferred:nextc it
+    (lambda ()
+      (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+        (ein:notebooklist-open url-or-port "" t)))))
 
+(provide 'pynt)
 ;;; pynt.el ends here

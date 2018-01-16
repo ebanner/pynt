@@ -15,62 +15,6 @@ def annotate(*code):
     """Annotate code with code to make and eval cells
 
     >>> s = '''
-    ... def foo():
-    ...     \"\"\"function\"\"\"
-    ...     print('foo!')
-    ...
-    ... def bar():
-    ...     print('bar!')
-    ...
-    ... def biz():
-    ...     print('biz!')
-    ... '''
-    >>> code = [s, 'foo']
-    >>> s = '''
-    ...
-    ... x
-    ... class Foo:
-    ...     def bar():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def biz():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...
-    ... class Qux:
-    ...     def quux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def quuux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ... x
-    ...
-    ... '''
-    >>> s = '''
-    ...
-    ... x
-    ... class Foo:
-    ...     def bar():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def biz():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...
-    ... class Qux:
-    ...     def quux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ...     def quuux():
-    ...         \"\"\"function\"\"\"
-    ...         pass
-    ... y
-    ...
-    ... '''
-    >>> code = [s, 'ast-server']
-    >>> code = [s, 'Foo.bar']
-    >>> s = '''
     ...
     ... x
     ... class Foo:

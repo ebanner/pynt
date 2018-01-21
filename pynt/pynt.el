@@ -226,7 +226,7 @@ This function should be called before evaluating any namespaces."
               (progn
                 (pynt-create-new-worksheet name)
                 (pynt-kill-cells name)
-                (puthash name (list start-line end-line) pynt-namespace-to-region-map)))))))))
+                (puthash name (list (buffer-name) start-line end-line) pynt-namespace-to-region-map)))))))))
 
 (defun pynt-execute-current-namespace ()
   "Generate a worksheet determined by the active namespace.
@@ -342,7 +342,7 @@ EIN cells from the python EPC client."
               mngr 'make-cell
               (lambda (&rest args)
                 (multiple-value-bind (expr buffer-name cell-type line-number) args
-                  (pynt-make-cell expr buffer-name cell-type (string-to-int line-number))
+                  (pynt-make-cell expr buffer-name cell-type (string-to-number line-number))
                   nil)))))))
     (setq pynt-elisp-relay-server (epcs:server-start connect-function pynt-epc-port))))
 
@@ -377,7 +377,7 @@ corresponds and is used during pynt scroll mode."
           (ws (ein:worksheet--get-ws-or-error)))
       (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
-            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
+            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (when (and (not (eq line-number -1)) pynt-line-to-cell-map) ; not sure why maps would be nil but it happens ¯\_(ツ)_/¯
         (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
           (puthash line-number (append previous-cells (list cell)) pynt-line-to-cell-map))))))
@@ -423,6 +423,21 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (pynt-start-elisp-relay-server)
   (pynt-start-py-epc-client))
 
+(defun pynt-narrow-code (notebook ws &optional show)
+  (let ((location (gethash (buffer-name) pynt-namespace-to-region-map)))
+    (when location
+      (multiple-value-bind (code-buffer-name start-line end-line) location
+        (with-selected-window (get-buffer-window code-buffer-name)
+          (widen)
+          (beginning-of-buffer)
+          (when (and (/= start-line -1) (/= end-line -1))
+            (goto-line start-line)
+            (setq start (point))
+            (goto-line end-line)
+            (setq end (point))
+            (narrow-to-region start end)
+            (beginning-of-buffer)))))))
+
 (define-minor-mode pynt-mode
   "Toggle pynt-mode
 
@@ -441,7 +456,10 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
         ;; (call-interactively 'ein:connect-to-notebook-buffer)
         (let* ((buffer-names (pynt-get-buffer-names-in-frame))
                (buffer-names-singleton (seq-filter (lambda (buffer-name) (string-prefix-p "*ein:" buffer-name)) buffer-names)))
+          (setq pynt-buffer-name (buffer-name))
           (setq pynt-notebook-buffer-name (car buffer-names-singleton))
+          (setq pynt-notebook-to-buffer-map (make-hash-table :test 'equal))
+          (puthash pynt-notebook-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
           (ein:connect-to-notebook-buffer pynt-notebook-buffer-name))
         (sit-for 2)
         (pynt-init-servers)
@@ -490,6 +508,10 @@ Minor mode for generating and interacting with jupyter notebooks via EIN"
     (lambda ()
       (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
         (ein:notebooklist-open url-or-port "" t)))))
+
+;;; Narrowing from the EIN worksheet
+(advice-add 'ein:notebook-worksheet-open-next-or-first :after 'pynt-narrow-code)
+(advice-add 'ein:notebook-worksheet-open-prev-or-last :after 'pynt-narrow-code)
 
 (provide 'pynt)
 ;;; pynt.el ends here

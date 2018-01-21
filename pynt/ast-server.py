@@ -32,7 +32,7 @@ def annotate(*code):
     ...     def quuux():
     ...         \"\"\"function\"\"\"
     ...         pass
-    ... x
+    ... y
     ...
     ... '''
     >>> code = [s, '*ast-server*']
@@ -59,22 +59,10 @@ def annotate(*code):
                     tree.body = [method]
                     break
 
-    logging.info('This is how to the looks before applying node transformations = ')
-    print(astor.to_source(tree))
-    logging.info('Exploding functions...')
-    tree = FunctionExploder(buffer=namespace).visit(tree)
-    logging.info(astor.to_source(tree))
-    logging.info('Rewriting syntax...')
-    tree = SyntaxRewriter(buffer=namespace).visit(tree)
-    logging.info(astor.to_source(tree))
-    logging.info('done!')
-    logging.info('Annotating code...')
-    logging.info('done!')
-    tree = Annotator(buffer=namespace).visit(tree)
-    logging.info('Converting AST to source...')
-    new_code = astor.to_source(tree)
-    logging.info(astor.to_source(tree))
-    logging.info('done!')
+    exploded_tree = FunctionExploder(buffer=namespace).visit(tree)
+    rewritten_tree = SyntaxRewriter(buffer=namespace).visit(exploded_tree)
+    annotated_tree = Annotator(buffer=namespace).visit(rewritten_tree)
+    new_code = astor.to_source(annotated_tree)
 
     return new_code
 
@@ -110,7 +98,7 @@ def parse_namespaces(*code):
     ...     def quuux():
     ...         \"\"\"function\"\"\"
     ...         pass
-    ... x
+    ... y
     ...
     ... '''
     >>> code = [s, '*ast-server*']
@@ -121,22 +109,18 @@ def parse_namespaces(*code):
     new_code = str()
     star, module_name, star = namespace.split('*')
     funcs = [stmt for stmt in tree.body if isinstance(stmt, ast.FunctionDef)]
-    logging.info(f'funcs = {funcs}')
     methods = []
     classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]
-    logging.info(f'classdefs = {classdefs}')
     for classdef in classdefs:
         for expr in classdef.body:
             if not isinstance(expr, ast.FunctionDef):
                 continue
             methods.append(expr)
-    logging.info(f'methods = {methods}')
     namespaces = \
         [(f'ns={module_name}', -1, -1)] + \
-        [(f'ns={module_name}.{func.name}', func.lineno, func.body[1].lineno) for func in funcs] + \
+        [(f'ns={module_name}.{func.name}', func.lineno, func.body[-1].lineno) for func in funcs] + \
         [(f'ns={module_name}.{classdef.name}.{expr.name}', method.lineno, method.body[-1].lineno) for method in methods]
     namespaces = list(reversed(namespaces))
-    logging.info(f'namespaces = {namespaces}')
     return namespaces
 
 if __name__ == '__main__':

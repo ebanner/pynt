@@ -4,16 +4,6 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 
 ![Demo](/img/demo.gif)
 
-## Screenshots
-
-### Jupyter Notebook Web Browser Client
-
-![Browser](/img/browser.png)
-
-### Emacs IPython Notebook Client
-
-![EIN](/img/ein.png)
-
 ## What is pynt?
 
 pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter.
@@ -65,6 +55,16 @@ The first step is starting EIN just like you normally would. My workflow for tha
 - [Bruce Hauman](http://rigsomelight.com/)
     - [Literate interactive coding: Devcards](https://www.youtube.com/watch?v=G7Z_g2fnEDg)
     - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)
+
+## Screenshots
+
+### Jupyter Notebook Web Browser Client
+
+![Browser](/img/browser.png)
+
+### Emacs IPython Notebook Client
+
+![EIN](/img/ein.png)
 
 ## Demonstration
 

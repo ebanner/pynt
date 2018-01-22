@@ -4,8 +4,6 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 
 ## Screenshots
 
-The jupyter notebook that pynt generates can be viewed with a jupyter notebook web browser client of with a Emacs IPython Notebook client.
-
 ### Jupyter Notebook Web Browser Client
 
 ![Browser](/img/browser.png)

@@ -1,4 +1,4 @@
-;;; pynt.el --- Generate jupyter notebooks from python via EIN
+;;; pynt.el --- Generate jupyter notebooks from python via EIN  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2018 Free Software Foundation, Inc.
 
@@ -18,6 +18,7 @@
 (require 'cl)
 (require 'epcs)
 (require 'epc)
+(require 'seq)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -36,7 +37,7 @@ docker container then this value should be
   "Narrow the notebook buffer if t and don't otherwise."
   :options '(nil t))
 
-(defvar pynt-epc-port 9999
+(defcustom pynt-epc-port 9999
   "The port that the current EPC client and server are communicating on.
 
 Every invocation of the command `pynt-mode' increments this
@@ -65,7 +66,7 @@ __name__ = '__pynt__'
 The value of `pynt-elisp-relay-server-hostname' and
 `pynt-epc-port' are used to complete this template.")
 
-(defvar pynt-verbose nil
+(defcustom pynt-verbose nil
   "Logging flag.
 
 Log debugging information if t and do not otherwise.")
@@ -295,14 +296,14 @@ The EPCS server's job is to relay commands to create an execute
 EIN cells from the python EPC client."
   (let ((connect-function
          (lambda (mngr)
-           (lexical-let ((mngr mngr))
+           (let ((mngr mngr))
              (epc:define-method
               mngr 'make-code-cell-and-eval
               (lambda (&rest args)
                 (let ((expr (car args))
                       (buffer-name (cadr args))
                       (cell-type (nth 2 args))
-                      (line-number (string-to-int (nth 3 args))))
+                      (line-number (string-to-number (nth 3 args))))
                   (pynt-log "(make-code-cell-and-eval %S %S %S %S)..." expr buffer-name cell-type line-number)
                   (pynt-make-code-cell-and-eval expr buffer-name cell-type line-number)
                   nil)))))))
@@ -344,7 +345,7 @@ corresponds and is used during pynt scroll mode."
           (ws (ein:worksheet--get-ws-or-error)))
       (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
-            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-int cell-type))))
+            (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (when (and (not (eq line-number -1)) pynt-line-to-cell-map) ; not sure why maps would be nil but it happens ¯\_(ツ)_/¯
         (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
           (puthash line-number (append previous-cells (list cell)) pynt-line-to-cell-map))))))

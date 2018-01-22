@@ -2,6 +2,8 @@
 
 Emacs package for generating and interacting with a jupyter notebooks from existing code.
 
+![Demo](/img/pynt.gif)
+
 ## Screenshots
 
 ### Jupyter Notebook Web Browser Client

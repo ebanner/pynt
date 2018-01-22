@@ -14,9 +14,15 @@ The jupyter notebook that pynt generates can be viewed with a jupyter notebook w
 
 ![EIN](/img/ein.png)
 
-## Demonstration
+## What is pynt?
 
-[![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")
+pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter.
+
+It takes as input a python file and produces a jupyter notebook. pynt-mode is an emacs minor mode which provides an interface for making this transformation as well as provides tooling for scrolling the generated notebook.
+
+Another way to think about pynt is it is a sort of "live" log. Imagine if you put print statements between every line of code. The output would be a text file that you could view. pynt outputs not a text file, but a jupyter notebook that you can interact with an execute. Think of it as a "starting point".
+
+Yet another way to think about pynt is it is like a debugger, but rather than only having access to a single line at a time, it is a debugger that is running for every line all at the same time.
 
 ## Prerequisites
 
@@ -59,3 +65,7 @@ The first step is starting EIN just like you normally would. My workflow for tha
 - [Bruce Hauman](http://rigsomelight.com/)
     - [Literate interactive coding: Devcards](https://www.youtube.com/watch?v=G7Z_g2fnEDg)
     - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)
+
+## Demonstration
+
+[![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")

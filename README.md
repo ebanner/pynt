@@ -34,14 +34,10 @@ Yet another way to think about pynt is it is like a debugger, but rather than on
 
 The first step is starting EIN just like you normally would. My workflow for that is the following.
 
-1. `M-x ein:notebooklist-login RET 8888 RET my-secret-password RET`
-2. `M-x ein:notebooklist-open RET 8888`
-3. Create a new notebook or choose an existing one (e.g. `*ein: http://127.0.0.1:8888/Untitled.ipynb*`
-4. Pull up your code side-by-side with the worksheet
-5. `M-x pynt-mode RET` to activate pynt-mode and select the notebook you chose in step 3
-6. `M-x pynt-generate-worksheet RET` to create blank worksheets for each function and "outside" context
-7. Switch to context buffer you want to inspect (i.e. `context=foo` buffer for a function `foo`)
-8. `M-x pynt-generate-worksheet RET` to generate a worksheet for this function
+1. Do `M-x pynt-mode RET` on a python file
+2. Pop over to the jupyter notebook and cycle through the namespaces with the `<left>` and `<right>` arrow keys
+3. Once you've decided on a namespace pop back over to the code and then hit `C-c C-e` or `M-x pynt-execute-current-namespace RET`
+4. Optionally toggle `M-x pynt-scroll-mode RET` to make the generated notebook scroll with your point
 
 ## Inspirations and Related Projects
 

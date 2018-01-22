@@ -2,11 +2,9 @@
 
 Emacs package for generating and interacting with a jupyter notebooks from existing code.
 
-## GIF
-
 ![Demo](/img/demo.gif)
 
-## YouTube
+## Feature Tour (YouTube)
 
 [![pynt Demo](http://img.youtube.com/vi/qqJbaoS_sH0/0.jpg)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
 

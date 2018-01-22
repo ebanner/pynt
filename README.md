@@ -2,9 +2,15 @@
 
 Emacs package for generating and interacting with a jupyter notebooks from existing code.
 
+## GIF
+
 ![Demo](/img/demo.gif)
 
-## What is pynt?
+## YouTube
+
+[![pynt Demo](http://img.youtube.com/vi/qqJbaoS_sH0/0.jpg)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
+
+## What is PYNT?
 
 pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter.
 
@@ -65,7 +71,3 @@ The first step is starting EIN just like you normally would. My workflow for tha
 ### Emacs IPython Notebook Client
 
 ![EIN](/img/ein.png)
-
-## Demonstration
-
-[![pynt Demo](http://img.youtube.com/vi/OkdkJ2fu_Oc/0.jpg)](http://www.youtube.com/watch?v=OkdkJ2fu_Oc "pynt Demo")

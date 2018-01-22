@@ -2,7 +2,7 @@
 
 Emacs package for generating and interacting with a jupyter notebooks from existing code.
 
-![Demo](/img/pynt.gif)
+![Demo](/img/demo.gif)
 
 ## Screenshots
 

@@ -13,6 +13,7 @@ Jupyter notebooks for software engineers.
 ```shell
 git clone https://github.com/ebanner/pynt.git
 echo '(load-file "~/pynt/pynt/pynt.el")' >> .emacs
+pip install --user jupyter epc
 emacs my-python-file.py
 M-x pynt-mode RET
 ```
@@ -43,25 +44,11 @@ Regarding familiar (existing) code, pynt allows you to, say, modify an existing 
 
 Regarding producing documentation, since pynt mixes markdown with code and data, it can serve as a piece of documentation to hand off to someone so they can quickly get up to speed with how the code works.
 
-## Prerequisites
-
-- Emacs
-- jupyter (python)
-- EIN [[1]](http://millejoh.github.io/emacs-ipython-notebook/) and [[2]](https://github.com/millejoh/emacs-ipython-notebook)
-- epc (python)
-
-## Installation
-
-
-
 ## Using pynt
 
-The first step is starting EIN just like you normally would. My workflow for that is the following.
+Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to create a jupyter notebook out of (by popping over to the notebook buffer and cycling through the available namespaces with the `<left>` and `<right>` arrow keys) then hitting `C-c C-e`.
 
-1. Do `M-x pynt-mode RET` on a python file
-2. Pop over to the jupyter notebook and cycle through the namespaces with the `<left>` and `<right>` arrow keys
-3. Once you've decided on a namespace pop back over to the code and then hit `C-c C-e` or `M-x pynt-execute-current-namespace RET`
-4. Optionally toggle `M-x pynt-scroll-mode RET` to make the generated notebook scroll with your point
+It is suggested at this point to enable `pynt-scroll-mode` to scroll the notebook buffer with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 
 ## Inspirations and Related Projects
 

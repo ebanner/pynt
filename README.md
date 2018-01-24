@@ -33,9 +33,9 @@ Yet another way to think about pynt is as a debugger. But rather than operating 
 
 pynt shines in the following two scenarios:
 
-1. When you wish to acquaint/familiarize yourself with new code
-2. When you wish to modify existing (familiar) code
-3. When you wish to produce documentation of code
+1. Acquainting/familiarizing yourself with someone else's code
+2. Modifying your code
+3. Producing documentation to familiarize someone else with your code
 
 Regarding new code, a common workflow of mine is to paste the code into a jupyter notebook, split up each line of code into its own cell, and evaluate each cell to see the effect of each line of code. *This is exactly what pynt does*.
 

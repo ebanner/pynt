@@ -11,11 +11,22 @@ pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter
 
 pynt takes a python file and produces a jupyter notebook. The resulting jupyter notebook can be opened in a [jupyter notebook web browser client](#jupyter-notebook-web-browser-client) or within emacs with a [Emacs IPython Notebook client](https://github.com/ebanner/pynt/blob/dev/README.md#emacs-ipython-notebook-client).
 
-In addition to this converter an emacs package called `pynt-mode` is provided which provides an interface for issuing this transformation as well as tooling for making the transition from code and jupyter notebook (and vice-versa) seamless.
+In addition an emacs package called `pynt-mode` is included which provides an interface for running pynt as well as tooling for making the transition from code and jupyter notebook (and vice-versa) seamless (i.e. by aligning code lines and jupyter cells automatically).
 
 Another way to think about pynt is as a tool which produces a *dynamic* (or *live*) log. A dynamic log is in contrast to a *static* (or *dead*) log which you could produce by, say, inserting print statements between each line of your code. pynt does this automatically *without you having to insert logging statements*.
 
-Yet another way to think about pynt is as a debugger. But rather than operating at one line at a time (as with traditional debuggers) you have access to *every line of code*.
+Yet another way to think about pynt is as a debugger. But rather than operating at one line at a time (as with traditional debuggers) you have access to *every line of code at all times*.
+
+## What are pynt use cases?
+
+pynt shines in the following two scenarios:
+
+1. When you wish to acquaint/familiarize yourself with new code
+2. When you wish to modify (familiar) existing code
+
+Regarding the former scenario, when playing around with new code I often would paste the code into a jupyter notebook, split up each line of code into its own cell, and evaluate each cell. This is exactly what pynt does.
+
+Regarding the latter scenario, pynt allows you to, say, modify an existing line of code, evaluate that line, and visually verify that it produces the desired data/output. This is in contrast to editing a line of code, invoking the code (i.e. by calling the surrounding function), and inspecting the output of the function.
 
 ## Prerequisites
 

@@ -8,6 +8,15 @@ Jupyter notebooks for software engineers.
 
 ![Demo](/img/demo.gif)
 
+## Quick Start
+
+```shell
+git clone https://github.com/ebanner/pynt.git /path/to/pynt
+echo '(load-file "/path/to/pynt/pynt/pynt.el")' >> /path/to/your/.emacs
+emacs /path/to/your/python/file.py
+M-x pynt-mode RET
+```
+
 ## What is pynt?
 
 pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter.
@@ -26,10 +35,13 @@ pynt shines in the following two scenarios:
 
 1. When you wish to acquaint/familiarize yourself with new code
 2. When you wish to modify existing (familiar) code
+3. When you wish to produce documentation of code
 
 Regarding new code, a common workflow of mine is to paste the code into a jupyter notebook, split up each line of code into its own cell, and evaluate each cell to see the effect of each line of code. *This is exactly what pynt does*.
 
 Regarding familiar (existing) code, pynt allows you to, say, modify an existing line of code, evaluate that line, and visually verify that it produces the desired data/output. This is in contrast to editing a line of code, invoking the code (i.e. by calling the surrounding function), and inspecting the output of the function.
+
+Regarding producing documentation, since pynt mixes markdown with code and data, it can serve as a piece of documentation to hand off to someone so they can quickly get up to speed with how the code works.
 
 ## Prerequisites
 
@@ -40,8 +52,7 @@ Regarding familiar (existing) code, pynt allows you to, say, modify an existing 
 
 ## Installation
 
-1. Clone this repo to `/your/local/path/pynt`
-2. Add `(load-file "/your/local/path/pynt/code/pynt.el")` to your `.emacs` file
+
 
 ## Using pynt
 

@@ -11,9 +11,9 @@ Jupyter notebooks for software engineers.
 ## Quick Start
 
 ```shell
-git clone https://github.com/ebanner/pynt.git /path/to/pynt
-echo '(load-file "/path/to/pynt/pynt/pynt.el")' >> /path/to/your/.emacs
-emacs /path/to/your/python/file.py
+git clone https://github.com/ebanner/pynt.git
+echo '(load-file "~/pynt/pynt/pynt.el")' >> .emacs
+emacs my-python-file.py
 M-x pynt-mode RET
 ```
 

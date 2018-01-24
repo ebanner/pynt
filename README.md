@@ -55,9 +55,9 @@ It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e.
 There are many projects, talks, and one-off instances of interactive programming "in the wild" that inspired me to create pynt. Here are a few of my favorites.
 
 - [SLIME](https://common-lisp.net/project/slime/)
-- [vim-slime](https://github.com/jpalardy/vim-slime)
-- [EIN](http://millejoh.github.io/emacs-ipython-notebook/)
+  - [vim-slime](https://github.com/jpalardy/vim-slime)
 - [Jupyter](http://jupyter.org/)
+  - [Emacs IPython Notebook](http://millejoh.github.io/emacs-ipython-notebook/)
 - [Introduction to Investing and Finance by Martin Shkreli](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)  (expert spreadsheet usage)
 - [Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
 - [Light Table - a new IDE concept](http://www.chris-granger.com/2012/04/12/light-table-a-new-ide-concept/)

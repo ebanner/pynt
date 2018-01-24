@@ -4,7 +4,7 @@ Emacs package for generating and interacting with a jupyter notebooks from exist
 
 ![Demo](/img/demo.gif)
 
-## Feature Tour (YouTube)
+- [🎥 Feature Tour (YouTube)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
 
 [![pynt Demo](http://img.youtube.com/vi/qqJbaoS_sH0/0.jpg)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
 

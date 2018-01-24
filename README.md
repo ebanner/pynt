@@ -1,22 +1,21 @@
 # PYNT (PYthon iNTeractive)
 
-Emacs package for generating and interacting with a jupyter notebooks from existing code.
-
-![Demo](/img/demo.gif)
+Jupyter notebooks for software engineers
 
 - [🎥 Feature Tour (YouTube)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
+- ![Demo](/img/demo.gif)
 
-[![pynt Demo](http://img.youtube.com/vi/qqJbaoS_sH0/0.jpg)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
-
-## What is PYNT?
+## What is pynt?
 
 pynt is fundamentally a python to jupyter notebook (`.py` to `.ipynb`) converter.
 
-It takes as input a python file and produces a jupyter notebook. pynt-mode is an emacs minor mode which provides an interface for making this transformation as well as provides tooling for scrolling the generated notebook.
+pynt takes a python file and produces a jupyter notebook. The resulting jupyter notebook can be opened in a [jupyter notebook web browser client](#jupyter-notebook-web-browser-client) or within emacs with a [Emacs IPython Notebook client](https://github.com/ebanner/pynt/blob/dev/README.md#emacs-ipython-notebook-client).
 
-Another way to think about pynt is it is a sort of "live" log. Imagine if you put print statements between every line of code. The output would be a text file that you could view. pynt outputs not a text file, but a jupyter notebook that you can interact with an execute. Think of it as a "starting point".
+In addition to this converter an emacs package called `pynt-mode` is provided which provides an interface for issuing this transformation as well as tooling for making the transition from code and jupyter notebook (and vice-versa) seamless.
 
-Yet another way to think about pynt is it is like a debugger, but rather than only having access to a single line at a time, it is a debugger that is running for every line all at the same time.
+Another way to think about pynt is as a tool which produces a *dynamic* (or *live*) log. A dynamic log is in contrast to a *static* (or *dead*) log which you could produce by, say, inserting print statements between each line of your code. pynt does this automatically *without you having to insert logging statements*.
+
+Yet another way to think about pynt is as a debugger. But rather than operating at one line at a time (as with traditional debuggers) you have access to *every line of code*.
 
 ## Prerequisites
 

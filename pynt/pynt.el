@@ -1,10 +1,10 @@
-;;; pynt.el --- Generate jupyter notebooks from python via EIN
+;;; pynt.el --- Generate jupyter notebooks from python via EIN  -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2018 Free Software Foundation, Inc.
 
 ;; Author: Edward Banner <edward.banner@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((emacs "24.4") (ein "0.13.1") (epc "0.1.1"))
+;; Package-Requires: ((emacs "24.4") (ein "0.13.1") (epc "0.1.1") (deferred "0.5.1"))
 ;; Keywords: convenience
 ;; URL: https://github.com/ebanner/pynt
 
@@ -15,10 +15,10 @@
 
 ;;; Code:
 
-(require 'ein-jupyter)
-(require 'cl)
-(require 'epcs)
+(require 'seq)
 (require 'epc)
+(require 'epcs)
+(require 'ein-jupyter)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -37,7 +37,7 @@ docker container then this value should be
   "Narrow the notebook buffer if t and don't otherwise."
   :options '(nil t))
 
-(defvar pynt-epc-port 9999
+(defcustom pynt-epc-port 9999
   "The port that the current EPC client and server are communicating on.
 
 Every invocation of the command `pynt-mode' increments this
@@ -61,12 +61,12 @@ def __cell__(content, buffer_name, cell_type, line_number):
 __name__ = '__pynt__'
 
 "
-  "Pythong code template which is evaluated in the current notebook..
+  "Python code template which is evaluated in the current notebook..
 
 The value of `pynt-elisp-relay-server-hostname' and
 `pynt-epc-port' are used to complete this template.")
 
-(defvar pynt-verbose nil
+(defcustom pynt-verbose nil
   "Logging flag.
 
 Log debugging information if t and do not otherwise.")
@@ -131,15 +131,15 @@ namespace corresponds to which code.")
   "Extract the module-level name of the pynt text buffer.
 
 If the buffer is associated with a python file then chop off the
-'.py' suffix. Otherwise (e.g. if this is a *scratch* buffer just
-retrun the buffer name. Throw an error if the buffer name has a
+'.py' suffix.  Otherwise (e.g. if this is a *scratch* buffer just
+retrun the buffer name.  Throw an error if the buffer name has a
 period in it because that will mess with the naming of namespaces
 that pynt uses."
   (if (string-suffix-p ".py" (buffer-name))
       (let ((namespace-tokens (nbutlast (split-string (buffer-name) "\\.py") 1)))
         (if (or (> (length namespace-tokens) 1)
                 (string-match-p (regexp-quote "=") (car namespace-tokens)))
-            (error "Buffer name cannot contain '.' nor '='. Rename your buffer and try again!")
+            (error "Buffer name cannot contain '.' nor '='.  Rename your buffer and try again!")
           (car namespace-tokens)))
     (buffer-name)))
 
@@ -199,7 +199,7 @@ This function mainly exists to clear out each namespace worksheet
 in the beginning to start them each with a blank slate."
   (interactive)
   (let* ((buffer-names (mapcar 'buffer-name (buffer-list)))
-        (worksheet-names (seq-filter (lambda (buffer-name) (string-prefix-p "ns=" buffer-name)) buffer-names)))
+         (worksheet-names (seq-filter (lambda (buffer-name) (string-prefix-p "ns=" buffer-name)) buffer-names)))
     (dolist (worksheet-name worksheet-names)
       (pynt-kill-cells worksheet-name))))
 
@@ -217,7 +217,7 @@ This function is used so we can pull out the worksheet name (i.e. name of the ac
   "Return the name of the active namespace.
 
 The active namespace will have a buffer in the active frame and
-will have the prefix 'ns='. If there is no such window then
+will have the prefix 'ns='.  If there is no such window then
 produce an error."
   (let* ((buffer-names (pynt-get-buffer-names-in-frame))
          (active-buffer-singleton (seq-filter
@@ -232,7 +232,7 @@ produce an error."
   "Parse through the active frame and pick out the active buffer.
 
 Set `pynt-active-namespace-buffer-name' and
-`pynt-active-namespace' accordingly. `NS-BUFFER-NAME' is a string."
+`pynt-active-namespace' accordingly.  `NS-BUFFER-NAME' is a string."
   (setq pynt-active-namespace-buffer-name ns-buffer-name)
   (let ((namespace-singleton (split-string pynt-active-namespace-buffer-name "ns=")))
     (setq pynt-active-namespace (cadr namespace-singleton))))
@@ -286,7 +286,7 @@ activate notebook defined by the variable
   "Scroll the worksheet buffer.
 
 Do it so the cell which corresponds to the line of code the point
-is on goes to the top. Make sure the cell we're about to jump to
+is on goes to the top.  Make sure the cell we're about to jump to
 is is indeed the active buffer.
 
 Go off of the variable `pynt-nth-cell-instance' in the case where
@@ -294,7 +294,7 @@ we want to see the nth pass though, say, a for loop.
 
 Wrap the main logic in a condition case because it could be the
 case that the cell that did correspond to a line has since been
-deleted. Basically there is a bunch of data invalidation that I
+deleted.  Basically there is a bunch of data invalidation that I
 don't want to worry about at this point in time."
   (interactive)
   (when (not (string-prefix-p "ns=" (buffer-name)))
@@ -373,7 +373,7 @@ The EPCS server's job is to relay commands to create an execute
 EIN cells from the python EPC client."
   (let ((connect-function
          (lambda (mngr)
-           (lexical-let ((mngr mngr))
+           (let ((mngr mngr))
              (epc:define-method
               mngr 'make-cell
               (lambda (&rest args)
@@ -435,7 +435,7 @@ This happens when pynt mode is exited."
   "Initialize the EPC client for the active kernel.
 
 This needs to be done so python can send commands to Emacs to
-create code cells. Use whatever the value is for
+create code cells.  Use whatever the value is for
 `pynt-elisp-relay-server-hostname' and `pynt-epc-port' to define the
 communication channels for the EPC client."
   (let ((pynt-init-code (format pynt-init-code-template pynt-elisp-relay-server-hostname pynt-epc-port)))

@@ -166,14 +166,6 @@ Choose from a helm popup list."
          (active-notebook-buffer-name (car active-notebook-buffer-names-singleton)))
     (get-buffer-window active-notebook-buffer-name)))
 
-(defun pynt-get-buffer-string ()
-  "Get the entire buffer as a string."
-  (save-excursion
-    (save-window-excursion
-      (progn
-        (end-of-buffer)
-        (buffer-substring-no-properties 1 (point))))))
-
 (defun pynt-log (&rest args)
   "Log the message when the variable `pynt-verbose' is `t.
 
@@ -248,7 +240,7 @@ This function should be called before evaluating any namespaces."
   (setq pynt-notebook-buffer-names nil)
   (setq pynt-namespace-to-region-map (make-hash-table :test 'equal))
   (pynt-set-active-namespace (format "ns=*%s*" (pynt-get-module-level-namespace)))
-  (let ((code (pynt-get-buffer-string)))
+  (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Calling parse_namespaces with pynt-activae-namespace = %s" pynt-active-namespace)
       (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,pynt-active-namespace))
@@ -275,7 +267,7 @@ activate notebook defined by the variable
   (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
   (pynt-kill-cells pynt-active-namespace-buffer-name)
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
-  (let ((code (pynt-get-buffer-string)))
+  (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Calling python AST server with active namespace = %s ..." pynt-active-namespace)
       (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-active-namespace))

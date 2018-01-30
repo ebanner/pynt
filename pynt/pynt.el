@@ -43,6 +43,12 @@ docker container then this value should be
 Every invocation of the command `pynt-mode' increments this
 number so there can be multiple EPC client-server pairs.")
 
+(defcustom pynt-start-jupyter-server-on-startup nil
+  "Whether to start a jupyter server on startup.
+
+Start a jupyter server on the port defined by the variable
+`ein:url-or-port' if t and do nothing otherwise.")
+
 (defvar pynt-init-code-template
   "
 
@@ -530,24 +536,26 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (setq pynt-nth-cell-instance 0))
 
 ;;; Start a jupyter notebook server in the user's home directory
-(deferred:$
-  (deferred:next
-    (lambda ()
-      (message "Starting jupyter notebook server...")
-      (let ((server-cmd-path (executable-find "jupyter"))
-            (notebook-directory (expand-file-name "~")))
-        (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
-      (deferred:wait 6000)))
-  (deferred:nextc it
-    (lambda ()
-      (ein:force-ipython-version-check)
-      (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-        (ein:notebooklist-login url-or-port token))
-      (deferred:wait 1000)))
-  (deferred:nextc it
-    (lambda ()
-      (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-        (ein:notebooklist-open url-or-port "" t)))))
+(when pynt-start-jupyter-server-on-startup
+  (deferred:$
+    (deferred:next
+      (lambda ()
+        (message "Starting jupyter notebook server...")
+        (let ((server-cmd-path (executable-find "jupyter"))
+              (notebook-directory (expand-file-name "~")))
+          (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
+        (deferred:wait 6000)))
+    (deferred:nextc it
+      (lambda ()
+        (ein:force-ipython-version-check)
+        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+          (pynt-log "url-or-port = % and token = %s" url-or-port token)
+          (ein:notebooklist-login url-or-port token))
+        (deferred:wait 1000)))
+    (deferred:nextc it
+      (lambda ()
+        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+          (ein:notebooklist-open url-or-port "" t))))))
 
 ;;; Narrowing from the EIN worksheet
 (advice-add 'ein:notebook-worksheet-open-next-or-first :after 'pynt-narrow-code)

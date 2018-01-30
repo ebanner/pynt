@@ -43,7 +43,7 @@ docker container then this value should be
 Every invocation of the command `pynt-mode' increments this
 number so there can be multiple EPC client-server pairs.")
 
-(defcustom pynt-start-jupyter-server-on-startup nil
+(defcustom pynt-start-jupyter-server-on-startup t
   "Whether to start a jupyter server on startup.
 
 Start a jupyter server on the port defined by the variable
@@ -128,10 +128,6 @@ namespace corresponds to which code.")
 
 (defvar-local pynt-elisp-relay-server nil "Elisp relay server")
 (defvar-local pynt-ast-server nil "Python AST server")
-
-(setq-local print-level 1)
-(setq-local print-length 1)
-(setq-local print-circle t)
 
 (defun pynt-get-module-level-namespace ()
   "Extract the module-level name of the pynt text buffer.

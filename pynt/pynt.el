@@ -339,14 +339,16 @@ lines of code and executed many times."
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side."
   (interactive)
-  (let* ((path (buffer-file-name))
-         (dir-path (substring (file-name-directory path) 0 -1))
-         (home-dir (concat (expand-file-name "~") "/"))
-         (nb-dir (replace-regexp-in-string home-dir "" dir-path))
-         (url-or-port (car (ein:jupyter-server-conn-info)))
-         (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
-    (with-current-buffer notebook-list-buffer-name
-      (ein:notebooklist-new-notebook url-or-port nil nb-dir))))
+  (save-selected-window
+    (let* ((path (buffer-file-name))
+           (dir-path (substring (file-name-directory path) 0 -1))
+           (home-dir (concat (expand-file-name "~") "/"))
+           (nb-dir (replace-regexp-in-string home-dir "" dir-path))
+           (url-or-port (car (ein:jupyter-server-conn-info)))
+           (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
+      (with-current-buffer notebook-list-buffer-name
+        (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
+    (sit-for 1)))
 
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in the `pynt-module-level-namespace' notebook.
@@ -484,10 +486,7 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (if pynt-mode
       (progn
         (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
-            (progn
-              (save-selected-window
-                (pynt-new-notebook)
-                (sit-for 1)))
+            (pynt-new-notebook)
           (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
           (call-interactively 'ein:connect-to-notebook-buffer))
         (let* ((buffer-names (pynt-get-buffer-names-in-frame))

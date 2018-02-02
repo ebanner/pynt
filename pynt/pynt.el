@@ -483,11 +483,13 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   :keymap pynt-mode-map
   (if pynt-mode
       (progn
-        (save-selected-window
-          (pynt-new-notebook)
-          (sit-for 1))
-        ;; (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
-        ;; (call-interactively 'ein:connect-to-notebook-buffer)
+        (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
+            (progn
+              (save-selected-window
+                (pynt-new-notebook)
+                (sit-for 1)))
+          (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
+          (call-interactively 'ein:connect-to-notebook-buffer))
         (let* ((buffer-names (pynt-get-buffer-names-in-frame))
                (buffer-names-singleton (seq-filter (lambda (buffer-name) (string-prefix-p "*ein:" buffer-name)) buffer-names)))
           (setq pynt-buffer-name (buffer-name))
@@ -501,7 +503,7 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
         (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
         (setq pynt-buffer-name (buffer-name))
         (pynt-make-namespace-worksheets))
-    ;; (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+    (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
     (pynt-stop-elisp-relay-server)
     (pynt-stop-ast-server)))
 

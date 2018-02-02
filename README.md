@@ -69,6 +69,7 @@ There are many projects, talks, and one-off instances of interactive programming
     - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)
 - [Bret Victor - Inventing on Principle (video)](https://vimeo.com/36579366)
     - [Tools to support live coding as in Bret Victor's “Inventing on Principle” talk](https://stackoverflow.com/questions/9448215/tools-to-support-live-coding-as-in-bret-victors-inventing-on-principle-talk)  (stack overflow)
+- [Debugger Driven Developement with Pry by Joel Turnbull](https://www.youtube.com/watch?v=4hfMUP5iTq8)
 
 ## Screenshots
 

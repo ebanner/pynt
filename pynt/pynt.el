@@ -72,7 +72,7 @@ __name__ = '__pynt__'
 The value of `pynt-elisp-relay-server-hostname' and
 `pynt-epc-port' are used to complete this template.")
 
-(defcustom pynt-verbose nil
+(defcustom pynt-verbose t
   "Logging flag.
 
 Log debugging information if t and do not otherwise.")
@@ -345,8 +345,10 @@ lines of code and executed many times."
          (nb-dir (replace-regexp-in-string home-dir "" dir-path))
          (url-or-port (car (ein:jupyter-server-conn-info)))
          (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
-    (with-current-buffer notebook-list-buffer-name
-      (ein:notebooklist-new-notebook url-or-port nil nb-dir))))
+    (save-selected-window
+      (with-current-buffer notebook-list-buffer-name
+        (ein:notebooklist-new-notebook url-or-port nil nb-dir))))
+  (sit-for 1))
 
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in the `pynt-module-level-namespace' notebook.
@@ -468,42 +470,31 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
             (narrow-to-region start end)
             (beginning-of-buffer)))))))
 
-(defvar pynt-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
-    (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
-    (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
-    map))
+;;; Start a jupyter notebook server in the user's home directory
+(when pynt-start-jupyter-server-on-startup
+  (deferred:$
+    (deferred:next
+      (lambda ()
+        (pynt-log "Starting jupyter notebook server...")
+        (let ((server-cmd-path (executable-find "jupyter"))
+              (notebook-directory (expand-file-name "~")))
+          (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
+        (deferred:wait 6000)))
+    (deferred:nextc it
+      (lambda ()
+        (ein:force-ipython-version-check)
+        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+          (pynt-log "url-or-port = %s and token = %s" url-or-port token)
+          (ein:notebooklist-login url-or-port token))
+        (deferred:wait 1000)))
+    (deferred:nextc it
+      (lambda ()
+        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
+          (ein:notebooklist-open url-or-port "" t))))))
 
-(define-minor-mode pynt-mode
-  "Minor mode for generating and interacting with jupyter notebooks via EIN
-
-\\{pynt-mode-map}"
-  :lighter " pynt "
-  :keymap pynt-mode-map
-  (if pynt-mode
-      (progn
-        (save-selected-window
-          (pynt-new-notebook)
-          (sit-for 1))
-        ;; (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
-        ;; (call-interactively 'ein:connect-to-notebook-buffer)
-        (let* ((buffer-names (pynt-get-buffer-names-in-frame))
-               (buffer-names-singleton (seq-filter (lambda (buffer-name) (string-prefix-p "*ein:" buffer-name)) buffer-names)))
-          (setq pynt-buffer-name (buffer-name))
-          (setq pynt-notebook-buffer-name (car buffer-names-singleton))
-          (setq pynt-notebook-to-buffer-map (make-hash-table :test 'equal))
-          (puthash pynt-notebook-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
-          (ein:connect-to-notebook-buffer pynt-notebook-buffer-name))
-        (sit-for 2)
-        (pynt-init-servers)
-        (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
-        (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
-        (setq pynt-buffer-name (buffer-name))
-        (pynt-make-namespace-worksheets))
-    ;; (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
-    (pynt-stop-elisp-relay-server)
-    (pynt-stop-ast-server)))
+;;; Narrowing from the EIN worksheet
+(advice-add 'ein:notebook-worksheet-open-next-or-first :after 'pynt-narrow-code)
+(advice-add 'ein:notebook-worksheet-open-prev-or-last :after 'pynt-narrow-code)
 
 (defvar pynt-scroll-mode-map
   (let ((map (make-sparse-keymap)))
@@ -523,31 +514,43 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
     (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
   (setq pynt-nth-cell-instance 0))
 
-;;; Start a jupyter notebook server in the user's home directory
-(when pynt-start-jupyter-server-on-startup
-  (deferred:$
-    (deferred:next
-      (lambda ()
-        (message "Starting jupyter notebook server...")
-        (let ((server-cmd-path (executable-find "jupyter"))
-              (notebook-directory (expand-file-name "~")))
-          (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
-        (deferred:wait 6000)))
-    (deferred:nextc it
-      (lambda ()
-        (ein:force-ipython-version-check)
-        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-          (pynt-log "url-or-port = % and token = %s" url-or-port token)
-          (ein:notebooklist-login url-or-port token))
-        (deferred:wait 1000)))
-    (deferred:nextc it
-      (lambda ()
-        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-          (ein:notebooklist-open url-or-port "" t))))))
+(defvar pynt-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
+    (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
+    (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
+    map))
 
-;;; Narrowing from the EIN worksheet
-(advice-add 'ein:notebook-worksheet-open-next-or-first :after 'pynt-narrow-code)
-(advice-add 'ein:notebook-worksheet-open-prev-or-last :after 'pynt-narrow-code)
+(define-minor-mode pynt-mode
+  "Minor mode for generating and interacting with jupyter notebooks via EIN
+
+If the user already has a EIN notebook open in a window in the
+current frame then the user is prompted for a notebook and it is
+expected that he/she selects that one. Otherwise a new notebook
+is created and opened up along side.
+
+\\{pynt-mode-map}"
+  :lighter " pynt "
+  :keymap pynt-mode-map
+  (if pynt-mode
+      (progn
+        (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
+            (pynt-new-notebook)
+          (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
+          (call-interactively 'ein:connect-to-notebook-buffer))
+        (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
+               (notebook-buffer-name (car notebook-buffer-name-singleton)))
+          (setq pynt-buffer-name (buffer-name))
+          (setq pynt-notebook-buffer-name notebook-buffer-name)
+          (setq pynt-module-level-namespace (pynt-get-module-level-namespace))
+          (ein:connect-to-notebook-buffer pynt-notebook-buffer-name)
+          (sit-for 2)
+          (pynt-init-servers)
+          (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
+          (pynt-make-namespace-worksheets)))
+    (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+    (pynt-stop-elisp-relay-server)
+    (pynt-stop-ast-server)))
 
 (provide 'pynt)
 ;;; pynt.el ends here

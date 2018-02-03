@@ -1,6 +1,6 @@
 # PYNT (PYthon iNTeractive)
 
-Jupyter notebooks for software engineers.
+Emacs minor mode for generating and interacting with jupyter notebooks.
 
 [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 

@@ -33,26 +33,17 @@ Once you have opened a python file and `pynt-mode` is active you should select t
 
 It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 
-## Inspirations and Related Projects
+## Related Projects
 
-There are many projects, talks, and one-off instances of interactive programming "in the wild" that inspired me to create pynt. Here are a few of my favorites.
+pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects who if they had not existed, then pynt would not have been possible.
 
-- [SLIME](https://common-lisp.net/project/slime/)
-  - [vim-slime](https://github.com/jpalardy/vim-slime)
+- [Emacs](https://www.gnu.org/software/emacs/)
+  - [Spacemacs](http://spacemacs.org/)
 - [Jupyter](http://jupyter.org/)
   - [Emacs IPython Notebook](http://millejoh.github.io/emacs-ipython-notebook/)
-- [Introduction to Investing and Finance by Martin Shkreli](https://www.youtube.com/watch?v=ARrNYyJEnFI&t=1379s)  (expert spreadsheet usage)
-- [Pure Functional Programming in Excel • Felienne Hermans](https://www.youtube.com/watch?v=0yKf8TrLUOw)
-- [Light Table - a new IDE concept](http://www.chris-granger.com/2012/04/12/light-table-a-new-ide-concept/)
-    - [EmacsWiki: Light Table](https://www.emacswiki.org/emacs/LightTable)
-    - [Video demonstration and commentary](https://www.youtube.com/watch?v=TgHvRcbYJ-8)
-- [CppCon 2014: Mike Acton "Data-Oriented Design and C++"](https://www.youtube.com/watch?v=rX0ItVEVjHc)
-- [Bruce Hauman](http://rigsomelight.com/)
-    - [Literate interactive coding: Devcards](https://www.youtube.com/watch?v=G7Z_g2fnEDg)
-    - [Developing ClojureScript With Figwheel](https://www.youtube.com/watch?v=j-kj2qwJa_E)
-- [Bret Victor - Inventing on Principle (video)](https://vimeo.com/36579366)
-    - [Tools to support live coding as in Bret Victor's “Inventing on Principle” talk](https://stackoverflow.com/questions/9448215/tools-to-support-live-coding-as-in-bret-victors-inventing-on-principle-talk)  (stack overflow)
-- [Debugger Driven Developement with Pry by Joel Turnbull](https://www.youtube.com/watch?v=4hfMUP5iTq8)
+- [Python](https://www.python.org/)
+- [SLIME](https://common-lisp.net/project/slime/)
+  - [vim-slime](https://github.com/jpalardy/vim-slime)
 
 ## Screenshots
 

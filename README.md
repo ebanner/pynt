@@ -22,14 +22,14 @@ M-x pynt-mode
 
 - *Dump a region of python code into a jupyter notebook*
   - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
-- *Scroll resulting jupyter notebook with the code buffer*
+- *Scroll the resulting jupyter notebook with the code buffer*
   - Alignment between code and cells are preserved even when cells are added and deleted
 
 ## Using pynt
 
-Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycle though the resulting code regions. Once you have made a selection then hit `C-c C-e` to dump that region into a jupyter notebook.
+Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycling though the resulting code regions. Once you have made a selection hit `C-c C-e` to dump that code region into a jupyter notebook.
 
-It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook buffer cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
+It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 
 ## Inspirations and Related Projects
 

@@ -13,9 +13,9 @@ Jupyter notebooks for software engineers.
 pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA run the following commands in emacs.
 
 ```
-M-x package-install RET pynt RET
-C-x C-f my-python-file.py RET
-M-x pynt-mode RET
+M-x package-install RET pynt
+C-x C-f my-python-file.py
+M-x pynt-mode
 ```
 
 ## What is pynt?

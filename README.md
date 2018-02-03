@@ -24,6 +24,8 @@ M-x pynt-mode
   - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
 - *Scroll the resulting jupyter notebook with the code buffer*
   - Alignment between code and cells are preserved even when cells are added and deleted
+- *Generate web-browser-based jupyter notebooks*
+  - Because pynt generates [EIN](http://millejoh.github.io/emacs-ipython-notebook/) notebooks you can hit `C-x C-s` on the generated notebook to save it as a `.ipynb` file which can be [opened up](#jupyter-notebook-web-browser-client) by a jupyter notebook web browser client
 
 ## Using pynt
 

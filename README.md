@@ -10,11 +10,11 @@ Jupyter notebooks for software engineers.
 
 ## Quick Start
 
-```shell
-git clone https://github.com/ebanner/pynt.git
-echo '(load-file "~/pynt/pynt/pynt.el")' >> .emacs
-pip install --user jupyter epc
-emacs my-python-file.py
+pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA run the following commands in emacs.
+
+```
+M-x package-install RET pynt RET
+C-x C-f my-python-file.py RET
 M-x pynt-mode RET
 ```
 

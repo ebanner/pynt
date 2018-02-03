@@ -35,7 +35,7 @@ It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e.
 
 ## Related Projects
 
-pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects who if they had not existed, then pynt would not have been possible.
+pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects where if they had not existed, then pynt would not have been possible.
 
 - [Emacs](https://www.gnu.org/software/emacs/)
   - [Spacemacs](http://spacemacs.org/)

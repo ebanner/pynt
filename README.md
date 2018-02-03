@@ -21,7 +21,7 @@ M-x pynt-mode
 ## Feature List
 
 - *On-the-fly notebook creation*
-  - Simply start pynt-mode on a python file and a new notebook will be created for you to interact with (provided you have set `pynt-start-jupyter-server-on-startup` to `t`)
+  - Simply start pynt-mode on a python file and a new notebook will be created for you to interact with (provided you have set the variable `pynt-start-jupyter-server-on-startup` to `t`)
 - *Dump a region of python code into a jupyter notebook*
   - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
 - *Scroll the resulting jupyter notebook with the code buffer*

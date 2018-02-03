@@ -37,10 +37,10 @@ It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e.
 
 pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects where if they had not existed, then pynt would not have been possible.
 
-- [Emacs](https://www.gnu.org/software/emacs/)
-  - [Spacemacs](http://spacemacs.org/)
 - [Jupyter](http://jupyter.org/)
   - [Emacs IPython Notebook](http://millejoh.github.io/emacs-ipython-notebook/)
+- [Emacs](https://www.gnu.org/software/emacs/)
+  - [Spacemacs](http://spacemacs.org/)
 - [Python](https://www.python.org/)
 - [SLIME](https://common-lisp.net/project/slime/)
   - [vim-slime](https://github.com/jpalardy/vim-slime)

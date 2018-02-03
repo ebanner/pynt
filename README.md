@@ -10,7 +10,7 @@ Emacs minor mode for generating and interacting with jupyter notebooks.
 
 ## Quick Start
 
-pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA run the following commands in emacs.
+pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
 
 ```
 M-x package-install RET pynt
@@ -21,13 +21,13 @@ M-x pynt-mode
 ## Feature List
 
 - *Dump a region of python code into a jupyter notebook*
-  - Select either a function, method, or code at the module level
+  - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
 - *Scroll resulting jupyter notebook with the code buffer*
   - Alignment between code and cells are preserved even when cells are added and deleted
 
 ## Using pynt
 
-Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook (by popping over to the notebook buffer and cycling through the available namespaces with the `<left>` and `<right>` arrow keys) then hitting `C-c C-e`.
+Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycle though the resulting code regions. Once you have made a selection then hit `C-c C-e` to dump that region into a jupyter notebook.
 
 It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook buffer cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 

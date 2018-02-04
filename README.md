@@ -4,7 +4,7 @@ Emacs minor mode for generating and interacting with jupyter notebooks.
 
 [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
-- [🎥 Feature Tour (YouTube)](http://www.youtube.com/watch?v=qqJbaoS_sH0 "pynt Demo")
+- [🎥 Feature Tour (YouTube)](https://youtu.be/wtVF5cMhBjg)
 
 ![Demo](/img/demo.gif)
 

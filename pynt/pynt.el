@@ -4,7 +4,7 @@
 
 ;; Author: Edward Banner <edward.banner@gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((emacs "24.4") (ein "0.13.1") (epc "0.1.1") (deferred "0.5.1"))
+;; Package-Requires: ((emacs "24.4") (ein "0.13.1") (epc "0.1.1") (deferred "0.5.1") (helm "2.8.8"))
 ;; Keywords: convenience
 ;; URL: https://github.com/ebanner/pynt
 

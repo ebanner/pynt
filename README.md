@@ -6,7 +6,7 @@ Emacs minor mode for generating and interacting with jupyter notebooks.
 
 - [🎥 Feature Tour (YouTube)](https://youtu.be/wtVF5cMhBjg)
 
-![Demo](/img/demo.gif)
+![Demo](https://gfycat.com/ThinWideeyedAidi)
 
 ## Quick Start
 

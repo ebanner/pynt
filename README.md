@@ -35,6 +35,15 @@ Once you have opened a python file and `pynt-mode` is active you should select t
 
 It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 
+## EIN Tips
+
+There are a few tweaks to EIN that make the pynt/EIN experience nicer IMO.
+
+- I like to have `C-<return>` and `S-<return>` [behave as they would](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L472-L476) in a jupyter web browser client
+- Sometimes it's convenient to [arrow through the worksheet](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L478-L480) in a EIN notebook buffer (warning: evil-specific)
+- Prevent jupyter from [popping open a new tab](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L496) in your web browser on startup
+
+
 ## Related Projects
 
 pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects where if they had not existed, then pynt would not have been possible.

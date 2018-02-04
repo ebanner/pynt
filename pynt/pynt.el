@@ -84,12 +84,11 @@ This is computed from the buffer name *once* when you activate
 pynt. It should never change after that.")
 
 (defvar-local pynt-active-namespace ""
-  "The active function name.
+  "The active namespace name.
 
-This is the function who will have code cells made from
-it/annotated/rolled out/whatever you want to call it. Needs to be
-the name of a python function in the current buffer or the value
-'outside' to indicate the code outside of any function.")
+This variable is sent to the python AST server to inform it which
+region of code to filter down to. It is used to set the value of
+the variable `pynt-active-namespace-buffer-name'.")
 
 (defvar-local pynt-active-namespace-buffer-name (format "ns=%s" pynt-active-namespace)
   "The buffer name of the active namespace.
@@ -114,17 +113,19 @@ The value of this variable via a call to the function
 (defvar-local pynt-notebook-buffer-names nil
   "List of buffer names in the notebook.")
 
-(defvar pynt-line-to-cell-map nil
+(defvar-local pynt-line-to-cell-map nil
   "Table mapping of source code line to EIN cell(s).
 
 A source code line may be associated with many EIN cells (e.g. a
 line in the body of a for loop.")
 
-(defvar pynt-namespace-to-region-map nil
+(defvar-local pynt-namespace-to-region-map nil
   "Map of namespace names to start and end lines.
 
 This map is used to produce a visual indication of which
-namespace corresponds to which code.")
+namespace corresponds to which code. It was originally part of a
+feature that was purely intended for making video demos prettier
+but does serve as a way to intuitively select a region of code.")
 
 (defvar-local pynt-elisp-relay-server nil "Elisp relay server")
 (defvar-local pynt-ast-server nil "Python AST server")
@@ -236,13 +237,13 @@ Set `pynt-active-namespace-buffer-name' and
 
 This function should be called before evaluating any namespaces."
   (interactive)
-  (setq pynt-namespaces nil)
-  (setq pynt-notebook-buffer-names nil)
-  (setq pynt-namespace-to-region-map (make-hash-table :test 'equal))
+  (setq pynt-namespaces nil
+        pynt-notebook-buffer-names nil
+        pynt-namespace-to-region-map (make-hash-table :test 'equal))
   (pynt-set-active-namespace (format "ns=*%s*" (pynt-get-module-level-namespace)))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (pynt-log "Calling parse_namespaces with pynt-activae-namespace = %s" pynt-active-namespace)
+      (pynt-log "Calling parse_namespaces with pynt-active-namespace = %s" pynt-active-namespace)
       (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,pynt-active-namespace))
       (deferred:nextc it
         (lambda (namespaces)
@@ -263,10 +264,10 @@ calls to make cells. Then send this code to be evaluated to the
 activate notebook defined by the variable
 `pynt-notebook-buffer-name'."
   (interactive)
+  (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
   (widen)
   (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
   (pynt-kill-cells pynt-active-namespace-buffer-name)
-  (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Calling python AST server with active namespace = %s ..." pynt-active-namespace)
@@ -291,7 +292,7 @@ case that the cell that did correspond to a line has since been
 deleted.  Basically there is a bunch of data invalidation that I
 don't want to worry about at this point in time."
   (interactive)
-  (when (not (string-prefix-p "ns=" (buffer-name)))
+  (when pynt-line-to-cell-map           ; sometimes this is nil (not sure why)!
     (save-selected-window
       (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
         (when cells
@@ -396,11 +397,21 @@ This function is called from python code running in a jupyter
 kernel via RPC.
 
 `LINE-NUMBER' is the line number in the code that the cell
-corresponds and is used during pynt scroll mode."
+corresponds and is used during pynt scroll mode. If `LINE-NUMBER'
+is -1 then that means the cell has no corresponding line. This
+happens with certain markdown cells which are generated.
+
+Since the variable `pynt-line-to-cell-map' is buffer-local we
+have to take special care to not access it while we're over in
+the worksheet buffer. Instead we save the variable we wish to
+append to `pynt-line-to-cell-map' into a temporary variable and
+then add it to `pynt-line-to-cell-map' when we're back in the
+code buffer."
   (pynt-log "(pytn-make-cell %S %S %S %S)..." expr buffer-name cell-type line-number)
 
   ;; These variables are buffer local so we need to grab them before switching
   ;; over to the worksheet buffer.
+  (setq new-cell nil)                   ; new cell to be added
   (with-current-buffer buffer-name
     (end-of-buffer)
     (call-interactively 'ein:worksheet-insert-cell-below)
@@ -410,9 +421,10 @@ corresponds and is used during pynt scroll mode."
       (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
             (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
-      (when (and (not (eq line-number -1)) pynt-line-to-cell-map) ; not sure why maps would be nil but it happens ¯\_(ツ)_/¯
-        (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
-          (puthash line-number (append previous-cells (list cell)) pynt-line-to-cell-map))))))
+      (setq new-cell cell)))
+  (when (not (eq line-number -1))
+    (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
+      (puthash line-number (append previous-cells (list new-cell)) pynt-line-to-cell-map))))
 
 (defun pynt-start-ast-server ()
   "Start python AST server."

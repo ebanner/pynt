@@ -135,7 +135,7 @@ but does serve as a way to intuitively select a region of code.")
 
 If the buffer is associated with a python file then chop off the
 '.py' suffix.  Otherwise (e.g. if this is a *scratch* buffer just
-retrun the buffer name.  Throw an error if the buffer name has a
+return the buffer name.  Throw an error if the buffer name has a
 period in it because that will mess with the naming of namespaces
 that pynt uses."
   (if (string-suffix-p ".py" (buffer-name))
@@ -541,7 +541,7 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
     (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
   (setq pynt-nth-cell-instance 0))
 
-;;; Start a jupyter notebook server in the user's home directory
+;;; Start a jupyter notebook server in the user's home directory on startup
 (when pynt-start-jupyter-server-on-startup
   (deferred:$
     (deferred:next
@@ -562,10 +562,6 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
       (lambda ()
         (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
           (ein:notebooklist-open url-or-port "" t))))))
-
-;;; Narrowing from the EIN worksheet
-(advice-add 'ein:notebook-worksheet-open-next-or-first :after 'pynt-narrow-code)
-(advice-add 'ein:notebook-worksheet-open-prev-or-last :after 'pynt-narrow-code)
 
 (provide 'pynt)
 ;;; pynt.el ends here

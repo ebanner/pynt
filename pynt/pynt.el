@@ -97,7 +97,7 @@ When you run the command `pynt-execute-current-namespace' this is the
 buffer that will have code cells added to it and evaluated. Is
 always of the form 'ns=`pynt-active-namespace''")
 
-(defvar-local pynt-notebook-buffer-name ""
+(defvar-local pynt-worksheet-buffer-name ""
   "Buffer name of the EIN notebook
 
 This variable holds the name of the notebook associated with the
@@ -110,7 +110,7 @@ current `pynt-mode' session. The value gets set when you can
 The value of this variable via a call to the function
 `pynt-make-namespace-worksheets'.")
 
-(defvar-local pynt-notebook-buffer-names nil
+(defvar-local pynt-worksheet-buffer-names nil
   "List of buffer names in the notebook.")
 
 (defvar-local pynt-line-to-cell-map nil
@@ -162,7 +162,7 @@ Choose from a helm popup list."
 (defun pynt-get-notebook-window ()
   "Get the EIN notebook window."
   (interactive)
-  (let* ((notebook-buffer-names (append (list pynt-notebook-buffer-name) pynt-notebook-buffer-names))
+  (let* ((notebook-buffer-names (append (list pynt-worksheet-buffer-name) pynt-worksheet-buffer-names))
          (active-notebook-buffer-names-singleton (seq-filter 'get-buffer-window notebook-buffer-names))
          (active-notebook-buffer-name (car active-notebook-buffer-names-singleton)))
     (get-buffer-window active-notebook-buffer-name)))
@@ -238,7 +238,7 @@ Set `pynt-active-namespace-buffer-name' and
 This function should be called before evaluating any namespaces."
   (interactive)
   (setq pynt-namespaces nil
-        pynt-notebook-buffer-names nil
+        pynt-worksheet-buffer-names nil
         pynt-namespace-to-region-map (make-hash-table :test 'equal))
   (pynt-set-active-namespace (format "ns=*%s*" (pynt-get-module-level-namespace)))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
@@ -262,7 +262,7 @@ This function should be called before evaluating any namespaces."
 Call out to the AST server to annotate the current namespace with
 calls to make cells. Then send this code to be evaluated to the
 activate notebook defined by the variable
-`pynt-notebook-buffer-name'."
+`pynt-worksheet-buffer-name'."
   (interactive)
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
   (widen)
@@ -356,10 +356,10 @@ lines of code and executed many times."
 
 Argument BUFFER-NAME the name of the buffer to create a new worksheet in."
   (interactive "MFunction name: ")
-  (setq pynt-notebook-buffer-names (append pynt-notebook-buffer-names (list buffer-name)))
+  (setq pynt-worksheet-buffer-names (append pynt-worksheet-buffer-names (list buffer-name)))
   (save-excursion
     (save-window-excursion
-      (with-current-buffer pynt-notebook-buffer-name
+      (with-current-buffer pynt-worksheet-buffer-name
         (call-interactively 'ein:notebook-worksheet-insert-next)
         (rename-buffer buffer-name)))))
 
@@ -458,7 +458,7 @@ So pynt mode can grab the buffer name of the main worksheet.
 Argument OLD-FUNCTION the function we are wrapping.
 Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
-  (setq pynt-notebook-buffer-name buffer-or-name)
+  (setq pynt-worksheet-buffer-name buffer-or-name)
   (apply old-function (list buffer-or-name)))
 
 (defun pynt-init-servers ()
@@ -504,24 +504,30 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
         (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
                (notebook-buffer-name (car notebook-buffer-name-singleton)))
           (setq pynt-buffer-name (buffer-name)
-                pynt-notebook-buffer-name notebook-buffer-name
+                pynt-worksheet-buffer-name notebook-buffer-name
                 pynt-notebook-to-buffer-map (make-hash-table :test 'equal)
                 pynt-module-level-namespace (pynt-get-module-level-namespace))
-          (puthash pynt-notebook-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
-          (ein:connect-to-notebook-buffer pynt-notebook-buffer-name)
+          (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
+          (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
           (sit-for 2)
           (pynt-init-servers)
           (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
           (pynt-make-namespace-worksheets)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
     (pynt-stop-elisp-relay-server)
-    (pynt-stop-ast-server)))
+    (pynt-stop-ast-server)
+    (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))))
 
 (defvar pynt-scroll-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "<up>") 'pynt-next-cell-instance)
     (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
     map))
+
+(defun pynt-delete-worksheet (worksheet-name)
+  (interactive)
+  (with-current-buffer worksheet-name
+    (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil)))
 
 (define-minor-mode pynt-scroll-mode
   "Minor mode for scrolling a EIN notebook side-by-side with code.

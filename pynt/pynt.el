@@ -49,6 +49,11 @@ number so there can be multiple EPC client-server pairs.")
 Start a jupyter server on the port defined by the variable
 `ein:url-or-port' if t and do nothing otherwise.")
 
+(defcustom pynt-verbose nil
+  "Logging flag.
+
+Log debugging information if t and do not otherwise.")
+
 (defvar pynt-init-code-template
   "
 
@@ -71,11 +76,6 @@ __name__ = '__pynt__'
 
 The value of `pynt-elisp-relay-server-hostname' and
 `pynt-epc-port' are used to complete this template.")
-
-(defcustom pynt-verbose nil
-  "Logging flag.
-
-Log debugging information if t and do not otherwise.")
 
 (defvar-local pynt-module-level-namespace ""
   "The module-level namespace of the buffer.

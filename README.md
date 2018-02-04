@@ -35,12 +35,12 @@ Once you have opened a python file and `pynt-mode` is active you should select t
 
 It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 
-## EIN Tips
+## EIN Tweaks
 
 There are a few tweaks to EIN that make the pynt/EIN experience nicer IMO.
 
-- Have `C-<return>` and `S-<return>` behave [as they would in a jupyter web browser client](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L472-L476)
-- [Arrow through the worksheets](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L478-L480) in a EIN notebook buffer (warning: evil-specific)
+- Have `C-<return>` and `S-<return>` behave [as they would in a jupyter web browser client](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L473-L476)
+- [Arrow through the worksheets](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L479-L480) in a EIN notebook buffer (warning: evil-specific)
 - Prevent jupyter from [popping open a new tab](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L496) in your web browser on startup
 
 

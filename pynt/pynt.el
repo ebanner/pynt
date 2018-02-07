@@ -420,10 +420,22 @@ EIN cells from the python EPC client."
     (multiple-value-bind (expr buffer-name cell-type line-number) args
       (pynt-make-cell expr buffer-name cell-type (string-to-number line-number))
       nil))
+
   (defun handle-report-exception (&rest args)
-    (multiple-value-bind (python-func-name) args
-      (message "The exception was hit in the function = %s" python-func-name)
+    "Switch to the namespace where the exception happened and execute it.
+
+Currently this only works with functions that do not have any
+arguments. If the function has arguments then the one in the
+docstring will be the ones that get inserted."
+    (multiple-value-bind (namespace-where) args
+      (when (not (string= namespace-where "<module>")) ; only jump when exception originated in some other function
+        (let* ((namespace (concat (pynt-get-module-level-namespace) "." namespace-where))
+               (namespace-buffer-name (format "ns=%s" namespace)))
+          (message "The exception was hit in the namespace = %s" namespace-buffer-name)
+          (with-selected-window (pynt-get-notebook-window) (switch-to-buffer namespace-buffer-name))
+          (pynt-execute-current-namespace)))
       nil))
+
   (let ((connect-function
          (lambda (mngr)
            (let ((mngr mngr))
@@ -556,6 +568,7 @@ deactivated."
 
 \\{pynt-mode-map}"
   :keymap pynt-mode-map
+  :lighter "pynt"
   (if pynt-mode
       (progn
         (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
@@ -589,6 +602,7 @@ deactivated."
 
 \\{pynt-scroll-mode-map}"
   :keymap pynt-scroll-mode-map
+  :lighter "pynt-scroll"
   (if pynt-scroll-mode
       (progn
         (add-hook 'post-command-hook #'pynt-scroll-cell-window :local))

@@ -71,15 +71,24 @@ The jupyter server listens on the port defined by the variable
 
 %%matplotlib inline
 
-from epc.client import EPCClient
 import time
+import traceback
+import IPython
+from epc.client import EPCClient
 
 epc_client = EPCClient(('%s', %s), log_traceback=True)
 
 def __cell__(content, buffer_name, cell_type, line_number):
-    elisp_func = 'make-cell'
-    epc_client.call_sync(elisp_func, args=[content, buffer_name, cell_type, line_number])
+    epc_client.call_sync('make-cell', args=[content, buffer_name, cell_type, line_number])
     time.sleep(0.01)
+
+def handler(shell, etype, evalue, tb, tb_offset=None):
+    frame_summaries = traceback.extract_tb(tb)
+    func_names = [frame_summary.name for frame_summary in frame_summaries]
+    func_name = func_names[-1]
+    epc_client.call_sync('report-exception', args=[func_name])
+
+IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
 
 __name__ = '__pynt__'
 
@@ -407,15 +416,19 @@ Argument BUFFER-NAME the name of the buffer to create a new worksheet in."
 
 The EPCS server's job is to relay commands to create an execute
 EIN cells from the python EPC client."
+  (defun handle-make-cell (&rest args)
+    (multiple-value-bind (expr buffer-name cell-type line-number) args
+      (pynt-make-cell expr buffer-name cell-type (string-to-number line-number))
+      nil))
+  (defun handle-report-exception (&rest args)
+    (multiple-value-bind (python-func-name) args
+      (message "The exception was hit in the function = %s" python-func-name)
+      nil))
   (let ((connect-function
          (lambda (mngr)
            (let ((mngr mngr))
-             (epc:define-method
-              mngr 'make-cell
-              (lambda (&rest args)
-                (multiple-value-bind (expr buffer-name cell-type line-number) args
-                  (pynt-make-cell expr buffer-name cell-type (string-to-number line-number))
-                  nil)))))))
+             (epc:define-method mngr 'make-cell 'handle-make-cell)
+             (epc:define-method mngr 'report-exception 'handle-report-exception)))))
     (setq pynt-elisp-relay-server (epcs:server-start connect-function pynt-epc-port))))
 
 (defun pynt-stop-elisp-relay-server ()

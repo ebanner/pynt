@@ -563,6 +563,18 @@ deactivated."
     (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
     map))
 
+(defun pynt-run-all-cells-above ()
+  "Execute all cells above and including the cell at point."
+  (interactive)
+  (save-excursion
+    (let ((end-cell (ein:get-cell-at-point)))
+      (beginning-of-buffer)
+      (setq cell (ein:get-cell-at-point))
+      (while (not (eq cell end-cell))
+        (call-interactively 'ein:worksheet-execute-cell-and-goto-next)
+        (setq cell (ein:get-cell-at-point)))
+      (call-interactively 'ein:worksheet-execute-cell))))
+
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN
 
@@ -623,7 +635,7 @@ deactivated."
       (lambda ()
         (ein:force-ipython-version-check)
         (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-          (pynt-log "url-or-port = % and token = %s" url-or-port token)
+          (pynt-log "url-or-port = %s and token = %s" url-or-port token)
           (ein:notebooklist-login url-or-port token))
         (deferred:wait 1000)))
     (deferred:nextc it

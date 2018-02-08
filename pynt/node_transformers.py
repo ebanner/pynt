@@ -65,16 +65,17 @@ class FunctionExploder(ast.NodeTransformer):
         >>> code = '''
         ...
         ... x
-        ... def foo(a):
+        ... def foo(a=1, b=2):
         ...     \"\"\"An example function
         ...
         ...     A detailed description.
         ...
         ...     >>> a = 5
+        ...     >>> b = 6
         ...
         ...     \"\"\"
-        ...     b = a + 1
-        ...     return b
+        ...     c = a + b
+        ...     return c
         ... y
         ... '''
         >>> tree = ast.parse(code)
@@ -87,7 +88,7 @@ class FunctionExploder(ast.NodeTransformer):
         parser = doctest.DocTestParser()
         results = parser.parse(docstring.value.s)
         docstring_prefix, docstring_examples = results[0], [result for result in results if isinstance(result, doctest.Example)]
-        assign_exprs = [example.source.strip() for example in docstring_examples]
+        docstring_assigns = [example.source.strip() for example in docstring_examples]
 
         # filter returns
         func.body = [stmt for stmt in func.body if not isinstance(stmt, ast.Return)]
@@ -104,14 +105,15 @@ class FunctionExploder(ast.NodeTransformer):
         )
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Example Input', cell_type='1'))
-        for assign_expr in assign_exprs:
+        for var, value in zip(func.args.args, func.args.defaults):
+            assign = Annotator.make_assignment(var, value)
+            exprs.append(assign)
+        for assign_expr in docstring_assigns:
             tree = ast.parse(assign_expr)
             exprs.append(tree.body[0])
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body of Function', cell_type='1'))
-        for stmt in func.body:
-            exprs.append(stmt)
 
-        return exprs
+        return exprs + func.body
 
 class SyntaxRewriter(ast.NodeTransformer):
     """Performs pure syntax rewrites
@@ -210,6 +212,16 @@ class SyntaxRewriter(ast.NodeTransformer):
 
 class Annotator(ast.NodeTransformer):
     """Annotates code with commands to create jupyter notebook cells"""
+
+    @staticmethod
+    def make_assignment(var, value):
+        """Make an assign node like 'var = value'"""
+        return ast.Assign(
+            targets=[
+                ast.Name(id=var, ctx=ast.Store()),
+            ],
+            value=value
+        )
 
     @staticmethod
     def make_annotation(node=None, buffer='outside', content=None, cell_type='code', lineno=None):

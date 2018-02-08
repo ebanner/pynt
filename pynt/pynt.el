@@ -82,11 +82,18 @@ def __cell__(content, buffer_name, cell_type, line_number):
     epc_client.call_sync('make-cell', args=[content, buffer_name, cell_type, line_number])
     time.sleep(0.01)
 
+__locals__ = dict()
 def handler(shell, etype, evalue, tb, tb_offset=None):
-    frame_summaries = traceback.extract_tb(tb)
-    func_names = [frame_summary.name for frame_summary in frame_summaries]
-    func_name = func_names[-1]
-    epc_client.call_sync('report-exception', args=[func_name])
+    while True:
+        if not tb.tb_next:
+            break
+        tb = tb.tb_next
+    frame_summary, = traceback.extract_tb(tb)
+    epc_client.call_sync('report-exception', args=[frame_summary.name])
+    if frame_summary.name == '<module>':
+        return
+    global __locals__
+    __locals__ = tb.tb_frame.f_locals
 
 IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
 

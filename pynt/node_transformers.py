@@ -65,13 +65,12 @@ class FunctionExploder(ast.NodeTransformer):
         >>> code = '''
         ...
         ... x
-        ... def foo(a=1, b=2):
+        ... def foo(a, b=2):
         ...     \"\"\"An example function
         ...
         ...     A detailed description.
         ...
         ...     >>> a = 5
-        ...     >>> b = 6
         ...
         ...     \"\"\"
         ...     c = a + b
@@ -105,12 +104,44 @@ class FunctionExploder(ast.NodeTransformer):
         )
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Example Input', cell_type='1'))
-        for var, value in zip(func.args.args, func.args.defaults):
-            assign = Annotator.make_assignment(var, value)
+
+        # keyword (default) values
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Keyword Argument Assignments', cell_type='1'))
+        vars, values = reversed(func.args.args), reversed(func.args.defaults)
+        for var, value in zip(vars, values):
+            assign = ast.Assign(
+                targets=[ast.Name(id=var.arg, ctx=ast.Store())],
+                value=value
+            )
             exprs.append(assign)
+
+        # docstring values override keyword values
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
         for assign_expr in docstring_assigns:
             tree = ast.parse(assign_expr)
             exprs.append(tree.body[0])
+
+        # previous exception lookup
+        # TODO: Use dict.get() or dict[var] if var in dict else var !!
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
+        for var in func.args.args:
+            assign = ast.Assign(
+                targets=[ast.Name(id=var.arg, ctx=ast.Store())],
+                value=ast.IfExp(
+                    test=ast.Compare(
+                        left=ast.Str(s=var.arg),
+                        ops=[ast.In()],
+                        comparators=[ast.Name(id='__locals__', ctx=ast.Load())]
+                    ),
+                    body=ast.Subscript(
+                        value=ast.Name(id='__locals__', ctx=ast.Load()),
+                        slice=ast.Index(value=ast.Str(s=var.arg)),
+                        ctx=ast.Load()
+                    ),
+                    orelse=ast.Name(id=var.arg, ctx=ast.Load()))
+            )
+            exprs.append(assign)
+
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body of Function', cell_type='1'))
 
         return exprs + func.body
@@ -212,16 +243,6 @@ class SyntaxRewriter(ast.NodeTransformer):
 
 class Annotator(ast.NodeTransformer):
     """Annotates code with commands to create jupyter notebook cells"""
-
-    @staticmethod
-    def make_assignment(var, value):
-        """Make an assign node like 'var = value'"""
-        return ast.Assign(
-            targets=[
-                ast.Name(id=var, ctx=ast.Store()),
-            ],
-            value=value
-        )
 
     @staticmethod
     def make_annotation(node=None, buffer='outside', content=None, cell_type='code', lineno=None):

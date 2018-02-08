@@ -115,11 +115,11 @@ def parse_namespaces(*code):
         for expr in classdef.body:
             if not isinstance(expr, ast.FunctionDef):
                 continue
-            methods.append(expr)
+            methods.append([classdef, expr])
     namespaces = \
         [(f'ns={module_name}', -1, -1)] + \
         [(f'ns={module_name}.{func.name}', func.lineno, func.body[-1].lineno) for func in funcs] + \
-        [(f'ns={module_name}.{classdef.name}.{expr.name}', method.lineno, method.body[-1].lineno) for method in methods]
+        [(f'ns={module_name}.{classdef.name}.{method.name}', method.lineno, method.body[-1].lineno) for classdef, method in methods]
     namespaces = list(reversed(namespaces))
     return namespaces
 

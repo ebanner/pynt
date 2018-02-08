@@ -121,8 +121,7 @@ class FunctionExploder(ast.NodeTransformer):
             tree = ast.parse(assign_expr)
             exprs.append(tree.body[0])
 
-        # previous exception lookup
-        # TODO: Use dict.get() or dict[var] if var in dict else var !!
+        # input values from previous exception
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
         for var in func.args.args:
             assign = ast.Assign(

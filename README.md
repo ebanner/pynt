@@ -3,14 +3,13 @@
 Emacs minor mode for generating and interacting with jupyter notebooks.
 
 [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
+[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt)
 
 - [🎥 Feature Tour (YouTube)](https://youtu.be/wtVF5cMhBjg)
 
 ![Demo](/img/demo.gif)
 
 ## Quick Start
-
-[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt)
 
 pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
 

@@ -10,6 +10,8 @@ Emacs minor mode for generating and interacting with jupyter notebooks.
 
 ## Quick Start
 
+[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt)
+
 pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
 
 ```

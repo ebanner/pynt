@@ -75,6 +75,7 @@ import time
 import traceback
 import IPython
 from epc.client import EPCClient
+from IPython.core.ultratb import AutoFormattedTB
 
 epc_client = EPCClient(('%s', %s), log_traceback=True)
 
@@ -83,7 +84,10 @@ def __cell__(content, buffer_name, cell_type, line_number):
     time.sleep(0.01)
 
 __locals__ = dict()
+tbf = AutoFormattedTB(mode='Plain', tb_offset=1)
 def handler(shell, etype, evalue, tb, tb_offset=None):
+    shell.showtraceback((etype, evalue, tb), tb_offset=tb_offset)
+    stb = tbf.structured_traceback(etype, evalue, tb)
     while True:
         if not tb.tb_next:
             break
@@ -94,6 +98,7 @@ def handler(shell, etype, evalue, tb, tb_offset=None):
         return
     global __locals__
     __locals__ = tb.tb_frame.f_locals
+    return stb
 
 IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
 

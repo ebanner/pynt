@@ -579,6 +579,7 @@ deactivated."
     (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
     (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
     (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
+    (define-key map (kbd "C-c C-k") 'pynt-switch-kernel)
     map))
 
 (defun pynt-run-all-cells-above ()
@@ -592,6 +593,18 @@ deactivated."
         (call-interactively 'ein:worksheet-execute-cell-and-goto-next)
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
+
+(defun pynt-switch-kernel (kernel-id)
+  "Switch over to a kernel which is exposed in an external python process."
+  (interactive "nKernel ID: ")
+  (with-current-buffer pynt-worksheet-buffer-name
+    (ein:notebook-switch-kernel (ein:get-notebook) "pynt_kernel")
+    (sit-for 5))
+  (pynt-stop-elisp-relay-server)
+  (pynt-stop-ast-server)
+  (ein:shared-output-eval-string (format "***%s***" kernel-id))
+  (sit-for 5)
+  (pynt-init-servers))
 
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN

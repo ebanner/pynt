@@ -406,6 +406,17 @@ the python file so that relative imports in the code work fine."
         (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
     (sit-for 1)))
 
+(defun pynt-toggle-debug ()
+  "Toggle pynt development mode.
+
+In pynt development mode we set the print-* variables to values
+so that when we try and print EIN deeply nested and recursive
+data structures they print and do not lock up emacs."
+  (interactive)
+  (setq print-level (if print-level nil 1)
+        print-length (if print-length nil 1)
+        print-circle (if print-circle nil t)))
+
 (defun pynt-create-new-worksheet (buffer-name)
   "Create a new worksheet in the `pynt-worksheet-buffer-name' notebook.
 

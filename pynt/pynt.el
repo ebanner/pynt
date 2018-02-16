@@ -83,7 +83,8 @@ def __cell__(content, buffer_name, cell_type, line_number):
     epc_client.call_sync('make-cell', args=[content, buffer_name, cell_type, line_number])
     time.sleep(0.01)
 
-__locals__ = dict()
+# __locals__ might have been set from an external python process
+__locals__ = dict() if not '__locals__' in vars() and '__locals__' not in globals() else __locals__
 tbf = AutoFormattedTB(mode='Plain', tb_offset=1)
 def handler(shell, etype, evalue, tb, tb_offset=None):
     shell.showtraceback((etype, evalue, tb), tb_offset=tb_offset)
@@ -459,11 +460,31 @@ docstring will be the ones that get inserted."
           (pynt-execute-current-namespace)))
       nil))
 
+  (defun handle-python-exception (&rest args)
+    "Switch to the namespace where the exception happened and execute it.
+
+In this case the exception occurred in an external kernel outside
+of jupyter. In addition to popping over to the relevant notebook
+we also need to retrieve the appropriate kernel, switch over to
+it, and set the local variables.
+
+Sit for 5 seconds while the python process generates a kernel
+file in ~/Library/Jupyter/runtime/."
+    (multiple-value-bind (namespace-where) args
+      (let ((namespace-buffer-name (format "ns=%s" namespace-where)))
+        (message "The exception was hit in the namespace = %s" namespace-buffer-name)
+        (with-selected-window (pynt-get-notebook-window) (switch-to-buffer namespace-buffer-name)))
+      (sit-for 5)
+      (pynt-switch-kernel (pynt-get-latest-kernel-id))
+      (pynt-execute-current-namespace)
+      nil))
+
   (let ((connect-function
          (lambda (mngr)
            (let ((mngr mngr))
              (epc:define-method mngr 'make-cell 'handle-make-cell)
-             (epc:define-method mngr 'report-exception 'handle-report-exception)))))
+             (epc:define-method mngr 'report-exception 'handle-report-exception)
+             (epc:define-method mngr 'python-exception 'handle-python-exception)))))
     (setq pynt-elisp-relay-server (epcs:server-start connect-function pynt-epc-port))))
 
 (defun pynt-stop-elisp-relay-server ()
@@ -534,8 +555,7 @@ create code cells. Use the variables
 `pynt-elisp-relay-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
   (let ((pynt-init-code (format pynt-init-code-template pynt-elisp-relay-server-hostname pynt-epc-port)))
-    (ein:shared-output-eval-string pynt-init-code))
-  (setq pynt-epc-port (1+ pynt-epc-port)))
+    (ein:shared-output-eval-string pynt-init-code)))
 
 (defun pynt-intercept-ein-notebook-name (old-function buffer-or-name)
   "Advice to add around `ein:connect-to-notebook-buffer'.
@@ -602,6 +622,7 @@ deactivated."
 (defun pynt-switch-kernel (kernel-id)
   "Switch over to a kernel which is exposed in an external python process."
   (interactive "nKernel ID: ")
+  (pynt-log "Switching to kernel with ID = %s" kernel-id)
   (with-current-buffer pynt-worksheet-buffer-name
     (ein:notebook-switch-kernel (ein:get-notebook) "pynt_kernel")
     (sit-for 5))
@@ -610,6 +631,15 @@ deactivated."
   (ein:shared-output-eval-string (format "***%s***" kernel-id))
   (sit-for 5)
   (pynt-init-servers))
+
+(defun pynt-get-latest-kernel-id ()
+  "Get the ID of the most recent kernel to be started."
+  (interactive)
+  (let* ((runtime-dir "/Users/ebanner/Library/Jupyter/runtime")
+         (kernel-paths (directory-files runtime-dir nil "^kernel-[[:digit:]]+.json$" 'file-newer-than-file-p))
+         (kernel-path (car (reverse kernel-paths))))
+    (string-match "kernel-\\([[:digit:]]+\\).json" kernel-path)
+    (match-string 1 kernel-path)))
 
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN

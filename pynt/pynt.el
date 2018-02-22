@@ -32,8 +32,8 @@
   "Customization group for pynt."
   :group 'applications)
 
-(defcustom pynt-elisp-relay-server-hostname "localhost"
-  "The hostname of the elisp relay server.
+(defcustom pynt-epc-server-hostname "localhost"
+  "The hostname of the EPC server.
 
 Usually set to \"localhost\" but if the jupyter kernel is running
 inside a docker container then this value should be
@@ -52,7 +52,7 @@ used."
   :options '(nil t))
 
 (defcustom pynt-epc-port 9999
-  "The port that the EPC relay server listens on.
+  "The port that the EPC server listens on.
 
 Every invocation of the command `pynt-mode' increments this
 number so that pynt mode can run in multiple buffers.")
@@ -108,7 +108,7 @@ __name__ = '__pynt__'
 "
   "Python code template which is evaluated early on.
 
-The value of `pynt-elisp-relay-server-hostname' and
+The value of `pynt-epc-server-hostname' and
 `pynt-epc-port' are used to complete this template.
 
 Having '__cell__()' and 'epc_client' defined in the associated
@@ -120,6 +120,14 @@ snippets to the EPC server.")
 
 (defvar pynt-extipy-jupyter-server-conn-info nil
   "The two-tuple containing the port and token for the extipy jupyter server.")
+
+(defvar pynt-epc-server nil
+  "Emacs server.
+
+There only ever needs to be one EPC server, even across multiple
+pynt mode instances.")
+
+(defvar pynt-ast-server nil "Python AST server")
 
 (defvar-local pynt-worksheet-buffer-name ""
   "The buffer name of the EIN notebook.
@@ -178,9 +186,6 @@ but does serve as a way to intuitively select a region of code.
 
 This map is used after a user changes the active namespace via
 the command `pynt-select-namespace'.")
-
-(defvar-local pynt-elisp-relay-server nil"Elisp relay server")
-(defvar-local pynt-ast-server nil "Python AST server")
 
 (defun pynt-get-module-level-namespace ()
   "Extract the module-level name of the pynt code buffer.
@@ -443,7 +448,7 @@ Argument BUFFER-NAME the name of the buffer to create a new worksheet in."
         (call-interactively 'ein:notebook-worksheet-insert-next)
         (rename-buffer buffer-name)))))
 
-(defun pynt-start-elisp-relay-server ()
+(defun pynt-start-epc-server ()
   "Start the EPC server and register its associated callback.
 
 The EPCS server's job is to relay commands to create an execute
@@ -493,14 +498,7 @@ file in ~/Library/Jupyter/runtime/."
              (epc:define-method mngr 'make-cell 'handle-make-cell)
              (epc:define-method mngr 'report-exception 'handle-report-exception)
              (epc:define-method mngr 'python-exception 'handle-python-exception)))))
-    (setq pynt-elisp-relay-server (epcs:server-start connect-function pynt-epc-port))))
-
-(defun pynt-stop-elisp-relay-server ()
-  "Terminate the elisp EPC relay server.
-
-This is called when pynt mode is deactivated.'"
-  (epcs:server-stop pynt-elisp-relay-server)
-  (setq pynt-elisp-relay-server nil))
+    (setq pynt-epc-server (epcs:server-start connect-function pynt-epc-port))))
 
 (defun pynt-make-cell (expr buffer-name cell-type line-number)
   "Make a new EIN cell and evaluate it.
@@ -545,24 +543,17 @@ code buffer."
 (defun pynt-start-ast-server ()
   "Start python AST server."
   (let* ((dirname (file-name-directory (symbol-file 'pynt-log)))
-         (ast-server-path (concat dirname "ast-server.py")))
+         (ast-server-path (concat dirname "ast_server.py")))
     (setq pynt-ast-server (epc:start-epc "python" `(,ast-server-path)))))
 
-(defun pynt-stop-ast-server ()
-  "Terminate the python AST server.
-
-This happens when pynt mode is exited."
-  (epc:stop-epc pynt-ast-server)
-  (setq pynt-ast-server nil))
-
-(defun pynt-start-py-epc-client ()
+(defun pynt-init-epc-client ()
   "Initialize the EPC client for the EIN notebook.
 
 This needs to be done so python can send commands to Emacs to
 create code cells. Use the variables
-`pynt-elisp-relay-server-hostname' and `pynt-epc-port' to define
+`pynt-epc-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
-  (let ((pynt-init-code (format pynt-init-code-template pynt-elisp-relay-server-hostname pynt-epc-port)))
+  (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port)))
     (ein:shared-output-eval-string pynt-init-code)))
 
 (defun pynt-intercept-ein-notebook-name (old-function buffer-or-name)
@@ -575,12 +566,6 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
   (setq pynt-worksheet-buffer-name buffer-or-name)
   (apply old-function (list buffer-or-name)))
-
-(defun pynt-init-servers ()
-  "Start AST and elisp relay server along with python EPC client."
-  (pynt-start-ast-server)
-  (pynt-start-elisp-relay-server)
-  (pynt-start-py-epc-client))
 
 (defun pynt-narrow-code (namespace)
   "Narrow the code buffer to the region defined by `NAMESPACE'."
@@ -612,7 +597,6 @@ deactivated."
     (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
     (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
     (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
-    (define-key map (kbd "C-c C-k") 'pynt-switch-kernel)
     map))
 
 (defun pynt-run-all-cells-above ()
@@ -626,28 +610,6 @@ deactivated."
         (call-interactively 'ein:worksheet-execute-cell-and-goto-next)
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
-
-(defun pynt-switch-kernel (kernel-id)
-  "Switch over to a kernel which is exposed in an external python process."
-  (interactive "nKernel ID: ")
-  (pynt-log "Switching to kernel with ID = %s" kernel-id)
-  (with-current-buffer pynt-worksheet-buffer-name
-    (ein:notebook-switch-kernel (ein:get-notebook) "pynt_kernel")
-    (sit-for 5))
-  (pynt-stop-elisp-relay-server)
-  (pynt-stop-ast-server)
-  (ein:shared-output-eval-string (format "***%s***" kernel-id))
-  (sit-for 5)
-  (pynt-init-servers))
-
-(defun pynt-get-latest-kernel-id ()
-  "Get the ID of the most recent kernel to be started."
-  (interactive)
-  (let* ((runtime-dir "/Users/ebanner/Library/Jupyter/runtime")
-         (kernel-paths (directory-files runtime-dir nil "^kernel-[[:digit:]]+.json$" 'file-newer-than-file-p))
-         (kernel-path (car (reverse kernel-paths))))
-    (string-match "kernel-\\([[:digit:]]+\\).json" kernel-path)
-    (match-string 1 kernel-path)))
 
 (defun pynt-jupyter-server-start (&optional args)
   "Start a jupyter server.
@@ -710,13 +672,16 @@ the most recently started jupyter server."
           (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
           (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
           (sit-for 2)
-          (pynt-init-servers)
+          (when (and (not pynt-epc-server) (not pynt-ast-server))
+            (pynt-start-epc-server)
+            (pynt-start-ast-server))
+          (pynt-init-epc-client)
           (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
           (pynt-make-namespace-worksheets)))
     (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
-    (pynt-stop-elisp-relay-server)
-    (pynt-stop-ast-server)
-    (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))))
+    (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
+    (delete-window (pynt-get-notebook-window))
+    (pynt-delete-worksheet pynt-worksheet-buffer-name)))
 
 (defvar pynt-scroll-mode-map
   (let ((map (make-sparse-keymap)))

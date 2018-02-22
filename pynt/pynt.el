@@ -54,8 +54,8 @@ used."
 (defcustom pynt-epc-port 9999
   "The port that the EPC server listens on.
 
-Every invocation of the command `pynt-mode' increments this
-number so that pynt mode can run in multiple buffers.")
+Every invocation of pynt mode increments this number so that pynt
+mode can run in multiple buffers.")
 
 (defcustom pynt-start-jupyter-server-on-startup t
   "Start a jupyter server on startup if t and do not otherwise.
@@ -133,8 +133,8 @@ pynt mode instances.")
   "The buffer name of the EIN notebook.
 
 This variable holds the name of the notebook associated with the
-current pynt-mode session. The value gets set soon after starting
-pynt-mode.
+current pynt mode session. The value gets set soon after starting
+pynt mode.
 
 More specifically this variable containes the name of the first
 EIN worksheet associated with the code buffer.")
@@ -651,37 +651,67 @@ the most recently started jupyter server."
       (lambda ()
         (setq pynt-extipy-jupyter-server-conn-info (ein:jupyter-server-conn-info))))))
 
+(defun pynt-mode-init ()
+  "Initialize pynt mode."
+
+  ;; If the user has already got their notebook and code side-by-side then just
+  ;; prompt them to confirm that's the notebook they want to use. Otherwise
+  ;; create a new notebook and line it up side-by-side.
+  (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
+      (let ((url-or-port (car pynt-default-jupyter-server-conn-info)))
+        (pynt-new-notebook url-or-port))
+    (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
+    (call-interactively 'ein:connect-to-notebook-buffer))
+
+  ;; Capture the code buffer name, worksheet buffer name, and maps that will
+  ;; link lines of code to their corresponding cells for scrolling.
+  (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
+         (notebook-buffer-name (car notebook-buffer-name-singleton)))
+    (setq pynt-buffer-name (buffer-name)
+          pynt-worksheet-buffer-name notebook-buffer-name
+          pynt-notebook-to-buffer-map (make-hash-table :test 'equal))
+    (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
+
+    ;; Set up EPC and AST servers but only if this is the first time we are
+    ;; starting pynt mode in this emacs session!
+    (when (and (not pynt-epc-server) (not pynt-ast-server))
+      (pynt-start-epc-server)
+      (pynt-start-ast-server))
+
+    ;; Connect the code buffer to the notebook instance, send the code buffer
+    ;; over to the notebook kernel to get top-level definitions defined, and
+    ;; initialize an EPC client in that notebook so it can talk to the EPC
+    ;; server.
+    (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
+    (sit-for 2)
+    (pynt-init-epc-client)
+    (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
+
+    ;; Parse out the code regions so we can select one right away and start
+    ;; coding!
+    (pynt-make-namespace-worksheets)))
+
+(defun pynt-mode-deactivate ()
+  "Deactivate pynt mode."
+
+  ;; Remove advice
+  (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+
+  ;; Remove notebook worksheets and pynt window
+  (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
+  (delete-window (pynt-get-notebook-window))
+  (pynt-delete-worksheet pynt-worksheet-buffer-name)
+
+  ;; Deactivate pynt scroll mode
+  (pynt-scroll-mode -1))
+
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN
 
 \\{pynt-mode-map}"
   :keymap pynt-mode-map
   :lighter "pynt"
-  (if pynt-mode
-      (progn
-        (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
-            (let ((url-or-port (car pynt-default-jupyter-server-conn-info)))
-              (pynt-new-notebook url-or-port))
-          (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
-          (call-interactively 'ein:connect-to-notebook-buffer))
-        (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
-               (notebook-buffer-name (car notebook-buffer-name-singleton)))
-          (setq pynt-buffer-name (buffer-name)
-                pynt-worksheet-buffer-name notebook-buffer-name
-                pynt-notebook-to-buffer-map (make-hash-table :test 'equal))
-          (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
-          (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
-          (sit-for 2)
-          (when (and (not pynt-epc-server) (not pynt-ast-server))
-            (pynt-start-epc-server)
-            (pynt-start-ast-server))
-          (pynt-init-epc-client)
-          (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
-          (pynt-make-namespace-worksheets)))
-    (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
-    (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
-    (delete-window (pynt-get-notebook-window))
-    (pynt-delete-worksheet pynt-worksheet-buffer-name)))
+  (if pynt-mode (pynt-mode-init) (pynt-mode-deactivate)))
 
 (defvar pynt-scroll-mode-map
   (let ((map (make-sparse-keymap)))

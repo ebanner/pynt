@@ -303,6 +303,7 @@ This is the last function called after activating pynt mode. The
 command `pynt-select-namespace' is ready to be called after this
 function completes."
   (interactive)
+  (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
   (setq pynt-namespaces nil
         pynt-worksheet-buffer-names nil
         pynt-namespace-to-region-map (make-hash-table :test 'equal))
@@ -316,11 +317,12 @@ function completes."
           (pynt-log "Namespaces = %s" namespaces)
           (dolist (namespace namespaces)
             (multiple-value-bind (name start-line end-line) namespace
-              (progn
-                (pynt-create-new-worksheet name)
-                (pynt-kill-cells name)
-                (setq pynt-namespaces (append pynt-namespaces (list name)))
-                (puthash name (list (buffer-name) start-line end-line) pynt-namespace-to-region-map)))))))))
+              (when (not (get-buffer name))
+                (progn
+                  (pynt-create-new-worksheet name)
+                  (pynt-kill-cells name)
+                  (setq pynt-namespaces (append pynt-namespaces (list name)))
+                  (puthash name (list (buffer-name) start-line end-line) pynt-namespace-to-region-map))))))))))
 
 (defun pynt-execute-current-namespace ()
   "Dump the code in `pynt-active-namespace' into its EIN worksheet buffer.

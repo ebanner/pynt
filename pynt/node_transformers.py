@@ -97,7 +97,7 @@ class FunctionExploder(ast.NodeTransformer):
         exprs.append(
             Annotator.make_annotation(
                 buffer=self.buffer,
-                content=' -> '.join(' '.join(upcase(t) for t in id.split('_')) for id in func.name.split('.')),
+                content=func.name,
                 cell_type='1',
                 lineno=func.lineno
             )

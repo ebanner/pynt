@@ -65,14 +65,7 @@ class FunctionExploder(ast.NodeTransformer):
         >>> code = '''
         ...
         ... x
-        ... def foo(a, b=2):
-        ...     \"\"\"An example function
-        ...
-        ...     A detailed description.
-        ...
-        ...     >>> a = 5
-        ...
-        ...     \"\"\"
+        ... def foo(a=1, b=2):
         ...     c = a + b
         ...     return c
         ... y
@@ -81,13 +74,13 @@ class FunctionExploder(ast.NodeTransformer):
         >>> func = tree.body[1]
 
         """
-        [docstring], func.body = func.body[:1], func.body[1:]
+        docstring, func.body = ast.get_docstring(func, clean=True), func.body[1:]
 
-        # docstring
-        parser = doctest.DocTestParser()
-        results = parser.parse(docstring.value.s)
-        docstring_prefix, docstring_examples = results[0], [result for result in results if isinstance(result, doctest.Example)]
-        docstring_assigns = [example.source.strip() for example in docstring_examples]
+        if docstring:
+            parser = doctest.DocTestParser()
+            results = parser.parse(docstring)
+            docstring_prefix, docstring_examples = results[0], [result for result in results if isinstance(result, doctest.Example)]
+            docstring_assigns = [example.source.strip() for example in docstring_examples]
 
         # filter returns
         func.body = [stmt for stmt in func.body if not isinstance(stmt, ast.Return)]
@@ -102,8 +95,8 @@ class FunctionExploder(ast.NodeTransformer):
                 lineno=func.lineno
             )
         )
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Example Input', cell_type='1'))
+        if docstring:
+            exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
 
         # keyword (default) values
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Keyword Argument Assignments', cell_type='1'))
@@ -116,30 +109,31 @@ class FunctionExploder(ast.NodeTransformer):
             exprs.append(assign)
 
         # docstring values override keyword values
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
-        for assign_expr in docstring_assigns:
-            tree = ast.parse(assign_expr)
-            exprs.append(tree.body[0])
+        if docstring:
+            exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
+            for assign_expr in docstring_assigns:
+                tree = ast.parse(assign_expr)
+                exprs.append(tree.body[0])
 
-        # input values from previous exception
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
-        for var in func.args.args:
-            assign = ast.Assign(
-                targets=[ast.Name(id=var.arg, ctx=ast.Store())],
-                value=ast.IfExp(
-                    test=ast.Compare(
-                        left=ast.Str(s=var.arg),
-                        ops=[ast.In()],
-                        comparators=[ast.Name(id='__locals__', ctx=ast.Load())]
-                    ),
-                    body=ast.Subscript(
-                        value=ast.Name(id='__locals__', ctx=ast.Load()),
-                        slice=ast.Index(value=ast.Str(s=var.arg)),
-                        ctx=ast.Load()
-                    ),
-                    orelse=ast.Name(id=var.arg, ctx=ast.Load()))
-            )
-            exprs.append(assign)
+        # # input values from previous exception
+        # exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
+        # for var in func.args.args:
+        #     assign = ast.Assign(
+        #         targets=[ast.Name(id=var.arg, ctx=ast.Store())],
+        #         value=ast.IfExp(
+        #             test=ast.Compare(
+        #                 left=ast.Str(s=var.arg),
+        #                 ops=[ast.In()],
+        #                 comparators=[ast.Name(id='__locals__', ctx=ast.Load())]
+        #             ),
+        #             body=ast.Subscript(
+        #                 value=ast.Name(id='__locals__', ctx=ast.Load()),
+        #                 slice=ast.Index(value=ast.Str(s=var.arg)),
+        #                 ctx=ast.Load()
+        #             ),
+        #             orelse=ast.Name(id=var.arg, ctx=ast.Load()))
+        #     )
+        #     exprs.append(assign)
 
         exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body of Function', cell_type='1'))
 

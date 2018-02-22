@@ -115,6 +115,12 @@ Having '__cell__()' and 'epc_client' defined in the associated
 IPython kernel allow the running python code to send code
 snippets to the EPC server.")
 
+(defvar pynt-default-jupyter-server-conn-info nil
+  "The two-tuple containing the port and token for the default jupyter server.")
+
+(defvar pynt-extipy-jupyter-server-conn-info nil
+  "The two-tuple containing the port and token for the extipy jupyter server.")
+
 (defvar-local pynt-worksheet-buffer-name ""
   "The buffer name of the EIN notebook.
 
@@ -395,18 +401,20 @@ This function is part of pynt scroll mode."
   (pynt-scroll-cell-window)
   (message "iteration # = %s" pynt-nth-cell-instance))
 
-(defun pynt-new-notebook ()
+(defun pynt-new-notebook (url-or-port)
   "Create a new EIN notebook and bring it up side-by-side.
 
 Make sure the new notebook is created in the same directory as
-the python file so that relative imports in the code work fine."
+the python file so that relative imports in the code work fine.
+
+The argument URL-OR-PORT is the url or port of the jupyter
+notebook server to connect to."
   (interactive)
   (save-selected-window
     (let* ((path (buffer-file-name))
            (dir-path (substring (file-name-directory path) 0 -1))
            (home-dir (concat (expand-file-name "~") "/"))
            (nb-dir (replace-regexp-in-string home-dir "" dir-path))
-           (url-or-port (car (ein:jupyter-server-conn-info)))
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
@@ -641,6 +649,46 @@ deactivated."
     (string-match "kernel-\\([[:digit:]]+\\).json" kernel-path)
     (match-string 1 kernel-path)))
 
+(defun pynt-jupyter-server-start (&optional args)
+  "Start a jupyter server.
+
+Also save the connection info in a variable for later so we can
+retrieve the token and port. This is due to a limitation in EIN
+where we can only retrieve this information for the most recently
+started jupyter server."
+  (interactive)
+  (let ((server-cmd-path ein:jupyter-default-server-command)
+        (notebook-directory (expand-file-name "~"))
+        (ein:jupyter-server-args (append ein:jupyter-server-args args)))
+    (ein:jupyter-server-start server-cmd-path notebook-directory)))
+
+(defun pynt-start-jupyter-servers ()
+  "Start the jupyter notebook servers.
+
+Save the connection infos for each in variables so later we can
+retrieve the token and port. We need to save this now due to a
+limitation in EIN where we can only retrieve this information for
+the most recently started jupyter server."
+  (interactive)
+  (deferred:$
+    (deferred:next
+      (lambda ()
+        (pynt-jupyter-server-start)
+        (deferred:wait 6000)))
+    (deferred:nextc it
+      (lambda ()
+        (setq pynt-default-jupyter-server-conn-info (ein:jupyter-server-conn-info))))
+    (deferred:nextc it
+      (lambda ()
+        (let ((extipy-args (list
+                            "--NotebookApp.kernel_manager_class=extipy.ExternalIPythonKernelManager"
+                            "--Session.key=b''")))
+          (pynt-jupyter-server-start extipy-args)
+          (deferred:wait 6000))))
+    (deferred:nextc it
+      (lambda ()
+        (setq pynt-extipy-jupyter-server-conn-info (ein:jupyter-server-conn-info))))))
+
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN
 
@@ -650,7 +698,8 @@ deactivated."
   (if pynt-mode
       (progn
         (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
-            (pynt-new-notebook)
+            (let ((url-or-port (car pynt-default-jupyter-server-conn-info)))
+              (pynt-new-notebook url-or-port))
           (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
           (call-interactively 'ein:connect-to-notebook-buffer))
         (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
@@ -687,27 +736,7 @@ deactivated."
     (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
   (setq pynt-nth-cell-instance 0))
 
-;;; Start a jupyter notebook server in the user's home directory on startup
-(when pynt-start-jupyter-server-on-startup
-  (deferred:$
-    (deferred:next
-      (lambda ()
-        (message "Starting jupyter notebook server...")
-        (let ((server-cmd-path (executable-find "jupyter"))
-              (notebook-directory (expand-file-name "~")))
-          (ein:jupyter-server--run ein:jupyter-server-buffer-name server-cmd-path notebook-directory))
-        (deferred:wait 6000)))
-    (deferred:nextc it
-      (lambda ()
-        (ein:force-ipython-version-check)
-        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-          (pynt-log "url-or-port = %s and token = %s" url-or-port token)
-          (ein:notebooklist-login url-or-port token))
-        (deferred:wait 1000)))
-    (deferred:nextc it
-      (lambda ()
-        (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-          (ein:notebooklist-open url-or-port "" t))))))
+(when pynt-start-jupyter-server-on-startup (pynt-start-jupyter-servers))
 
 (provide 'pynt)
 ;;; pynt.el ends here

@@ -14,6 +14,18 @@ server = EPCServer(('localhost', 0))
 def annotate(*code):
     """Annotate code with code to make and eval cells
 
+    Args:
+        s (str): the code
+        ns (str): the namespace
+
+    `ns` is of the form
+
+        - <module-name>
+        - <module-name>.<func-name>
+        - <module-name>.<class-name>.<method-name>
+
+    code = [s, ns]
+
     >>> s = '''
     ...
     ... x
@@ -35,7 +47,9 @@ def annotate(*code):
     ... y
     ...
     ... '''
-    >>> code = [s, '*ast-server*']
+    >>>
+    >>> namespace = 'ast-server.Qux.quux'
+    >>> code = [s, namespace]
 
     """
     code, namespace = code[0], code[1]
@@ -51,13 +65,13 @@ def annotate(*code):
         assert len(ns_tokens) == 3
         module_name, class_name, method_name = ns_tokens
         classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]
-        for classdef in classdefs:
-            methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
-            for method in methods:
-                if method.name == method_name:
-                    method.name = namespace # rename method for readability
-                    tree.body = [method]
-                    break
+        classdef = [classdef for classdef in classdefs if classdef.name == class_name][0]
+        methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
+        for method in methods:
+            if method.name == method_name:
+                method.name = namespace # rename method for readability
+                tree.body = [method]
+                break
 
     exploded_tree = FunctionExploder(buffer=namespace).visit(tree)
     rewritten_tree = SyntaxRewriter(buffer=namespace).visit(exploded_tree)

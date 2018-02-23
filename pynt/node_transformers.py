@@ -20,6 +20,169 @@ def upcase(s):
     return f'{s[0].upper()}{s[1:]}'
 
 
+class IPythonEmbedder(ast.NodeTransformer):
+    """Replaces the body of a function with `IPython.embed_kernel()`.
+
+    Specifically swap out the body of a function with a call to fork off the
+    `IPython.embed_kernel()` call.
+
+    """
+    def __init__(self, namespace):
+        """
+
+        >>> self = IPythonEmbedder.__new__(IPythonEmbedder)
+        >>> namespace = 'foo.bar'
+        >>> __class__ = IPythonEmbedder
+
+        """
+        super(__class__, self).__init__()
+        self.namespace = namespace
+        tokens = namespace.split('.')
+        if len(tokens) == 2:
+            module, self.func_name = tokens
+            self.func_type = 'function'
+        else:
+            assert len(tokens) == 3
+            module, self.class_name, self.func_name = tokens
+            self.func_type = 'method'
+
+    @staticmethod
+    def _after_method(namespace):
+        super(__class__, self).__init__()
+        self.namespace = namespace
+
+    def visit_ClassDef(self, classdef):
+        """Embed a kernel into classdef.target`
+
+        If either `self.func_type` is a function or `self.class_name` does not
+        match this class then that means this is not the classdef you are
+        looking for.
+
+        >>> self = IPythonEmbedder(namespace='ast_server.Foo.biz')
+        >>> code = '''
+        ...
+        ... class Foo:
+        ...     def bar():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...     def biz():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...
+        ... '''
+        >>>
+        >>> tree = ast.parse(code)
+        >>> classdef = tree.body[0]
+
+        """
+        if self.func_type == 'function':
+            node = classdef
+        elif not self.class_name == classdef.name:
+            node = classdef
+        else:
+            assert classdef.name == self.class_name and self.func_type == 'method'
+            methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
+            [idx, method], = [(i, method) for i, method in enumerate(methods) if method.name == self.func_name]
+            classdef.body[idx] = self.visit_FunctionDef(method)
+            node = classdef
+        return node
+
+    def visit_FunctionDef(self, func):
+        """Embed a `IPython.embed_kernel()` call into the function
+
+        Recall the context this node visitor is running in is that we are
+        embedding a function. Because of the existence of `visit_ClassDef()`
+        the only time we will visit a method is when we are called directly on
+        the method that needs to be embedded. Hence it is sufficient to just
+        check that `func.name == self.func_name` with no risk that we will
+        embed a method which has the same name as the target method but is in a
+        different class.
+
+        >>> self = IPythonEmbedder(namespace='ast_server.foo')
+        >>> code = '''
+        ...
+        ... x
+        ... def foo():
+        ...     x = 1
+        ...     y = 2
+        ...     z = x + y
+        ...     return z
+        ... y
+        ...
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> func = tree.body[1]
+        >>> c = '''
+        ...
+        ... import os
+        ... try:
+        ...     pid = os.fork()
+        ... except OSError:
+        ...     exit("Could not create a child process")
+        ... if pid > 0:
+        ...     exit(0)
+        ... import IPython
+        ... IPython.embed_kernel()
+        ...
+        ... '''
+        >>> embed = ast.parse(c)
+
+        """
+        if not func.name == self.func_name:
+            node = fun
+        else:
+            body = [
+                ast.Import(names=[ast.alias(name='os', asname=None)]),
+                ast.Try(
+                    body=[
+                        ast.Assign(
+                            targets=[ast.Name(id='pid', ctx=ast.Store())],
+                            value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])),
+                    ],
+                    handlers=[
+                        ast.ExceptHandler(
+                            type=ast.Name(id='OSError', ctx=ast.Load()),
+                            name=None,
+                            body=[
+                                ast.Expr(
+                                    value=ast.Call(
+                                        func=ast.Name(id='exit', ctx=ast.Load()),
+                                        args=[ast.Num(n=1)],
+                                        keywords=[]
+                                    )
+                                ),
+                            ]
+                        ),
+                    ],
+                    orelse=[],
+                    finalbody=[]
+                ),
+                ast.If(
+                    test=ast.Compare(
+                        left=ast.Name(id='pid', ctx=ast.Load()),
+                        ops=[ast.Gt()],
+                        comparators=[ast.Num(n=0),]
+                    ),
+                    body=[ast.Expr(value=ast.Call(func=ast.Name(id='exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))],
+                    orelse=[]
+                ),
+                ast.Import(names=[ast.alias(name='IPython', asname=None)]),
+                ast.Expr(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(id='IPython', ctx=ast.Load()),
+                            attr='embed_kernel', ctx=ast.Load()
+                        ),
+                        args=[],
+                        keywords=[]
+                    )
+                )
+            ]
+            func.body = body
+            node = func
+        return node
+
+
 class FunctionExploder(ast.NodeTransformer):
     """Exposes the body of a function to the next scope up
 

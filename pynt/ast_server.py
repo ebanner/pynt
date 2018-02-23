@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.INFO)
 
 import astor
 from epc.server import EPCServer
-from node_transformers import Annotator, FunctionExploder, SyntaxRewriter
+from node_transformers import Annotator, FunctionExploder, SyntaxRewriter, IPythonEmbedder
 
 server = EPCServer(('localhost', 0))
 
@@ -136,6 +136,53 @@ def parse_namespaces(*code):
         [(f'ns={module_name}.{classdef.name}.{method.name}', method.lineno, method.body[-1].lineno) for classdef, method in methods]
     namespaces = list(reversed(namespaces))
     return namespaces
+
+@server.register_function
+def embed(*code):
+    """Replace the function or method with a call to `IPython.embed()`
+
+    Args:
+        s (str): the code
+        ns (str): the namespace
+
+    `ns` is of the form
+
+        - <module-name>.<func-name>
+        - <module-name>.<class-name>.<method-name>
+
+    code = [s, ns]
+
+    >>> s = '''
+    ...
+    ... x
+    ... class Foo:
+    ...     def bar():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def biz():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...
+    ... class Qux:
+    ...     def quux():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def quuux():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ... y
+    ...
+    ... '''
+    >>>
+    >>> namespace = 'ast_server.Qux.quux'
+    >>> code = [s, namespace]
+
+    """
+    code, namespace = code[0], code[1]
+    tree = ast.parse(code)
+    embedded = IPythonEmbedder(namespace).visit(tree)
+    c = astor.to_source(embedded)
+    return c
 
 if __name__ == '__main__':
     server.print_port()

@@ -21,7 +21,7 @@ class RationalNumber:
         """Constructor
 
         >>> self = RationalNumber.__new__(RationalNumber)
-        >>> n = 3
+        >>> n = 4
         >>> d = 2
 
         """
@@ -31,7 +31,7 @@ class RationalNumber:
     def __repr__(self):
         """Return a string representation
 
-        >>> self = RationalNumber(n=3, d=2)
+        >>> self = RationalNumber(n=4, d=2)
 
         """
         r = f'{self.n}/{self.d}'

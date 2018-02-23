@@ -21,7 +21,7 @@ class RationalNumber:
         """Constructor
 
         >>> self = RationalNumber.__new__(RationalNumber)
-        >>> n = 3
+        >>> n = 4
         >>> d = 2
 
         """

@@ -591,8 +591,9 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
 This is called for every EIN worksheet when pynt mode is
 deactivated."
   (interactive)
-  (with-current-buffer worksheet-name
-    (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil)))
+  (when (get-buffer worksheet-name)
+    (with-current-buffer worksheet-name
+      (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil))))
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))
@@ -667,7 +668,8 @@ the most recently started jupyter server."
 
   ;; Capture the code buffer name, worksheet buffer name, and maps that will
   ;; link lines of code to their corresponding cells for scrolling.
-  (let* ((notebook-buffer-name-singleton (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
+  (let* ((notebook-buffer-name-singleton
+          (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
          (notebook-buffer-name (car notebook-buffer-name-singleton)))
     (setq pynt-buffer-name (buffer-name)
           pynt-worksheet-buffer-name notebook-buffer-name

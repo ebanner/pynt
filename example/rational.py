@@ -13,6 +13,9 @@ Rational numbers need not be normalized.
 
 """
 
+import fractions
+
+
 class RationalNumber:
     def __init__(self, n, d):
         """Constructor

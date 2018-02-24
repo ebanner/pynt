@@ -16,31 +16,33 @@ from node_transformers import IPythonEmbedder
 
 
 @plac.annotations(
-        fname=('file name to embed kernel in', 'option', None, str),
-        namespace=('namespace to embed kernel in', 'option', None, str),
-        cmd=('namespace to embed kernel in', 'option', None, str),
+        namespace=('function to embed a kernel in', 'option', None, str),
+        cmd=('command which invokes the function', 'option', None, str),
 )
-def main(fname='biz.py', namespace='biz.bar', cmd='python biz.py'):
+def main(namespace='biz.bar', cmd='python biz.py'):
     """Embed a kernel in `fname` in `namespace`
 
     Args:
-        fname (str): file name to embed kernel in
-        namespace (str): namespace to embed kernel in
-        cmd (str): command which invokes `fname`
+        namespace (str): function to embed a kernel in
+        cmd (str): command which invokes `namespace`
 
     Returns:
         None
 
-    You need to pass `fname` so we know which file to modify/make a temporary
-    copy of. You need to pass `namespace` so we know which function to embed.
-    You need to pass `cmd` so we know which command to invoke so that
-    `namespace` gets called.
+    `namespace` is of the form module.(class.)?[method|func]
 
-    Is anything redundant?
+    Examples:
+        - my_module.my_func
+        - my_module.MyClass.my_func
+
+    >>> namespace = 'biz.Biz.baz'
 
     """
+    module = namespace.split('.')[0]
+    path = '.'.join([module, 'py'])
+
     # Read in Input File
-    with open(fname) as f:
+    with open(path) as f:
         lines = f.readlines()
     code = ''.join(lines)
 
@@ -51,10 +53,10 @@ def main(fname='biz.py', namespace='biz.bar', cmd='python biz.py'):
 
     # Copy the Old File to a Temporary File
     t = tempfile.NamedTemporaryFile(delete=False)
-    shutil.copyfile(fname, t.name)
+    shutil.copyfile(path, t.name)
 
-    # Dump New Code to `fname`
-    with open(fname, 'w') as f:
+    # Dump New Code to `path`
+    with open(path, 'w') as f:
         f.write(code_)
 
     # Run `cmd`
@@ -62,7 +64,7 @@ def main(fname='biz.py', namespace='biz.bar', cmd='python biz.py'):
     assert p.returncode == 0
 
     # Move Original File Back
-    shutil.copyfile(t.name, fname)
+    shutil.copyfile(t.name, path)
 
 
 if __name__ == '__main__':

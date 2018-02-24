@@ -129,7 +129,7 @@ class IPythonEmbedder(ast.NodeTransformer):
 
         """
         if not func.name == self.func_name:
-            node = fun
+            node = func
         else:
             body = [
                 ast.Import(names=[ast.alias(name='os', asname=None)]),
@@ -237,9 +237,9 @@ class FunctionExploder(ast.NodeTransformer):
         >>> func = tree.body[1]
 
         """
-        docstring, func.body = ast.get_docstring(func, clean=True), func.body[1:]
-
+        docstring = ast.get_docstring(func, clean=True)
         if docstring:
+            func.body = func.body[1:]
             parser = doctest.DocTestParser()
             results = parser.parse(docstring)
             docstring_prefix, docstring_examples = results[0], [result for result in results if isinstance(result, doctest.Example)]
@@ -404,7 +404,9 @@ class Annotator(ast.NodeTransformer):
     def make_annotation(node=None, buffer='outside', content=None, cell_type='code', lineno=None):
         """Return a ast.Expr that looks like
 
-        __cell__('make-code-cell-and-eval', [content, buffer, cell_type])
+        __cell__('make-cell', [content, buffer, cell_type])
+
+        >>> content = 'x = 5'
 
         """
         content = astor.to_source(node).strip() if node else content

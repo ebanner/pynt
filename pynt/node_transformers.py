@@ -112,20 +112,6 @@ class IPythonEmbedder(ast.NodeTransformer):
         ... '''
         >>> tree = ast.parse(code)
         >>> func = tree.body[1]
-        >>> c = '''
-        ...
-        ... import os
-        ... try:
-        ...     pid = os.fork()
-        ... except OSError:
-        ...     exit("Could not create a child process")
-        ... if pid > 0:
-        ...     exit(0)
-        ... import IPython
-        ... IPython.embed_kernel()
-        ...
-        ... '''
-        >>> embed = ast.parse(c)
 
         """
         if not func.name == self.func_name:
@@ -161,11 +147,18 @@ class IPythonEmbedder(ast.NodeTransformer):
                     test=ast.Compare(
                         left=ast.Name(id='pid', ctx=ast.Load()),
                         ops=[ast.Gt()],
-                        comparators=[ast.Num(n=0),]
+                        comparators=[ast.Num(n=0)]
                     ),
-                    body=[ast.Expr(value=ast.Call(func=ast.Name(id='exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))],
+                    body=[
+                        ast.Import(names=[ast.alias(name='time', asname=None)]),
+                        ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1)], keywords=[])),
+                        ast.Expr(value=ast.Call(func=ast.Name(id='exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
+                    ],
                     orelse=[]
                 ),
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='chdir', ctx=ast.Load()), args=[ast.Str(s='/')], keywords=[])),
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
                 ast.Import(names=[ast.alias(name='IPython', asname=None)]),
                 ast.Expr(
                     value=ast.Call(

@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.INFO)
 
 import astor
 from epc.server import EPCServer
-from node_transformers import Annotator, FunctionExploder, SyntaxRewriter, IPythonEmbedder
+from node_transformers import Annotator, FunctionExploder, SyntaxRewriter, IPythonEmbedder, LineNumberFinder
 
 server = EPCServer(('localhost', 0))
 
@@ -183,6 +183,54 @@ def embed(*code):
     embedded = IPythonEmbedder(namespace).visit(tree)
     c = astor.to_source(embedded)
     return c
+
+def find_namespace(code, func_name, lineno):
+    """Compute the fully qualified namespace of `func_name` at `lineno` from `code`
+
+    Args:
+        code (str): the code
+        func_name (str): the function name
+        lineno (str): the line that `func_name` is defined at in `code`
+
+    Returns:
+        A namespace string
+
+        - <func-name>
+        - <class-name>.<method-name>
+
+    >>> code = '''
+    ...
+    ... x
+    ... class Foo:
+    ...     def bar():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def biz():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...
+    ... class Qux:
+    ...     def bar():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ...     def biz():
+    ...         \"\"\"function\"\"\"
+    ...         pass
+    ... y
+    ...
+    ... '''
+    >>>
+    >>> func_name = 'bar'
+    >>> lineno = 5
+
+    """
+    namespace = None
+    try:
+        LineNumberFinder(func_name, lineno).visit(tree)
+    except Exception as e:
+        namespace, = e.args
+    return namespace
+
 
 if __name__ == '__main__':
     server.print_port()

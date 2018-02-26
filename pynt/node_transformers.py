@@ -20,6 +20,72 @@ def upcase(s):
     return f'{s[0].upper()}{s[1:]}'
 
 
+class LineNumberFinder(ast.NodeTransformer):
+    """Find the function or method which is defined at a particular line number"""
+
+    def __init__(self, func_name, lineno):
+        """
+
+        >>> self = LineNumberFinder.__new__(LineNumberFinder)
+        >>> __class__ = LineNumberFinder
+        >>> func_name = 'bar'
+        >>> lineno = 5
+
+        """
+        super(__class__, self).__init__()
+        self.func_name = func_name
+        self.lineno = lineno
+
+    def visit_ClassDef(self, classdef):
+        """Check the line number of each of the methods
+
+        >>> self = LineNumberFinder(func_name='bar', lineno=4)
+        >>> code = '''
+        ...
+        ... class Foo:
+        ...     def bar():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...     def biz():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...
+        ... '''
+        >>>
+        >>> tree = ast.parse(code)
+        >>> classdef = tree.body[0]
+
+        """
+        methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
+        for method in methods:
+            if method.name == self.func_name and method.lineno == self.lineno:
+                raise Exception(f'{classdef.name}.{method.name}')
+        return classdef
+
+    def visit_FunctionDef(self, func):
+        """Embed a `IPython.embed_kernel()` call into the function
+
+        >>> self = LineNumberFinder(func_name='bar', lineno=4)
+        >>> code = '''
+        ...
+        ... class Foo:
+        ...     def bar():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...     def biz():
+        ...         \"\"\"function\"\"\"
+        ...         pass
+        ...
+        ... '''
+        >>>
+        >>> tree = ast.parse(code)
+        >>> classdef = tree.body[0]
+
+        """
+        if func.name == self.func_name and func.lineno == self.lineno:
+            raise Exception(func.name)
+        return func
+
 class IPythonEmbedder(ast.NodeTransformer):
     """Replaces the body of a function with `IPython.embed_kernel()`.
 

@@ -233,6 +233,7 @@ will mess with the namespace naming convention that pynt uses."
           (action . (lambda (namespace)
                       (with-selected-window (pynt-get-notebook-window) (switch-to-buffer namespace))
                       (pynt-narrow-code namespace)
+                      (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
                       (message "Type 'C-c C-e' to dump *%s* into the notebook!" namespace))))))
 
 (defun pynt-get-notebook-window ()
@@ -637,12 +638,26 @@ deactivated."
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
 
-(defun pynt-jack-in ()
+(defun pynt-jack-in (cmd)
   "Jack into the current namespace via a command."
   (interactive)
   (set-process-sentinel
-   (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py")
+   (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py" "-namespace" pynt-active-namespace "-cmd" cmd)
    'pynt-attach-to-running-kernel-and-exec))
+
+(defun pynt-select-jack-in-command ()
+  "Select the jack-in command.
+
+Available commands include those in the file pynt.json whose key
+is the variable `pynt-active-namespace'."
+  (interactive)
+  (let* ((namespace-to-cmd-map (json-read-file "pynt.json"))
+         (namespace-cmds (alist-get (intern pynt-active-namespace) namespace-to-cmd-map))
+         (namespace-cmds (append namespace-cmds nil)))
+    (helm :sources
+          `((name . "Select Jack-In Command")
+            (candidates . ,namespace-cmds)
+            (action . pynt-jack-in)))))
 
 (defun pynt-jupyter-server-start ()
   "Start a jupyter notebook server.
@@ -722,7 +737,7 @@ IPython kernels."
     (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
     (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
     (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
-    (define-key map (kbd "C-c C-k") 'pynt-jack-in)
+    (define-key map (kbd "C-c C-k") 'pynt-select-jack-in-command)
     map))
 
 (define-minor-mode pynt-mode

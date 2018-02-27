@@ -19,7 +19,7 @@ from node_transformers import IPythonEmbedder
         namespace=('function to embed a kernel in', 'option', None, str),
         cmd=('command which invokes the function', 'option', None, str),
 )
-def main(namespace='biz.bar', cmd='python biz.py'):
+def main(namespace, cmd):
     """Embed a kernel in `fname` in `namespace`
 
     Args:
@@ -34,8 +34,6 @@ def main(namespace='biz.bar', cmd='python biz.py'):
     Examples:
         - my_module.my_func
         - my_module.MyClass.my_func
-
-    >>> namespace = 'biz.Biz.baz'
 
     """
     module = namespace.split('.')[0]
@@ -61,7 +59,7 @@ def main(namespace='biz.bar', cmd='python biz.py'):
 
     # Run `cmd`
     p = subprocess.run(cmd.split())
-    assert p.returncode == 0
+    print(f'p.returncode = {p.returncode}')
 
     # Move Original File Back
     shutil.copyfile(t.name, path)

@@ -5,6 +5,11 @@ A small collection of functions.
 """
 
 
+class Biz:
+    def baz(f=5, g=6):
+        h = f + g
+        return h
+
 def foo(a=1, b=2):
     c = a + b
     return c

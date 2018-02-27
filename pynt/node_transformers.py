@@ -226,16 +226,7 @@ class IPythonEmbedder(ast.NodeTransformer):
                 ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
                 ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
                 ast.Import(names=[ast.alias(name='IPython', asname=None)]),
-                ast.Expr(
-                    value=ast.Call(
-                        func=ast.Attribute(
-                            value=ast.Name(id='IPython', ctx=ast.Load()),
-                            attr='embed_kernel', ctx=ast.Load()
-                        ),
-                        args=[],
-                        keywords=[]
-                    )
-                )
+                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
             ]
             func.body = body
             node = func
@@ -288,6 +279,14 @@ class FunctionExploder(ast.NodeTransformer):
         ...
         ... x
         ... def foo(a=1, b=2):
+        ...     \"\"\"\Short description
+        ...
+        ...     Longer description.
+        ...
+        ...     >>> a = 1
+        ...     >>> b = 2
+        ...
+        ...     "\"\"
         ...     c = a + b
         ...     return c
         ... y

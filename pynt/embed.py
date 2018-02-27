@@ -66,6 +66,10 @@ def main(namespace='biz.bar', cmd='python biz.py'):
     # Move Original File Back
     shutil.copyfile(t.name, path)
 
+    # Write .pynt to runtime dir so a kernel (re)start will attach to this
+    # kernel
+    open('/Users/ebanner/Library/Jupyter/runtime/.pynt', 'a').close()
+
 
 if __name__ == '__main__':
     plac.call(main)

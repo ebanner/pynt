@@ -141,12 +141,6 @@ Having '__cell__()' and 'epc_client' defined in the associated
 IPython kernel allow the running python code to send code
 snippets to the EPC server.")
 
-(defvar pynt-default-jupyter-server-conn-info nil
-  "The two-tuple containing the port and token for the default jupyter server.")
-
-(defvar pynt-extipy-jupyter-server-conn-info nil
-  "The two-tuple containing the port and token for the extipy jupyter server.")
-
 (defvar pynt-epc-server nil
   "Emacs server.
 
@@ -621,12 +615,15 @@ deactivated."
     (with-current-buffer worksheet-name
       (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil))))
 
-(defvar pynt-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
-    (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
-    (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
-    map))
+(defun pynt-attach-to-running-kernel-and-exec (process event)
+  "Attach to the most recently started kernel and execute."
+  (interactive)
+  (message "Process: %s had the event %s" process event)
+  (with-current-buffer pynt-worksheet-buffer-name
+    (ein:notebook-restart-kernel-command))
+  (sit-for 3)
+  (pynt-init-epc-client)
+  (pynt-execute-current-namespace))
 
 (defun pynt-run-all-cells-above ()
   "Execute all cells above and including the cell at point."
@@ -640,54 +637,39 @@ deactivated."
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
 
-(defun pynt-jupyter-server-start (&optional args)
-  "Start a jupyter server.
-
-Also save the connection info in a variable for later so we can
-retrieve the token and port. This is due to a limitation in EIN
-where we can only retrieve this information for the most recently
-started jupyter server."
+(defun pynt-jack-in ()
+  "Jack into the current namespace via a command."
   (interactive)
-  (let ((server-cmd-path ein:jupyter-default-server-command)
-        (notebook-directory (expand-file-name "~"))
-        (ein:jupyter-server-args (append ein:jupyter-server-args args)))
-    (ein:jupyter-server-start server-cmd-path notebook-directory)))
+  (set-process-sentinel
+   (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py")
+   'pynt-attach-to-running-kernel-and-exec))
 
-(defun pynt-start-jupyter-servers ()
-  "Start the jupyter notebook servers.
+(defun pynt-jupyter-server-start ()
+  "Start a jupyter notebook server.
 
-Save the connection infos for each in variables so later we can
-retrieve the token and port. We need to save this now due to a
-limitation in EIN where we can only retrieve this information for
-the most recently started jupyter server."
+Start it in the user's home directory and use the
+`ExternalIPythonKernelManager' so we can attach to external
+IPython kernels."
   (interactive)
   (deferred:$
     (deferred:next
       (lambda ()
-        (pynt-jupyter-server-start)
-        (deferred:wait 6000)))
-    (deferred:nextc it
-      (lambda ()
-        (setq pynt-default-jupyter-server-conn-info (ein:jupyter-server-conn-info))))
-    (deferred:nextc it
-      (lambda ()
-        (let ((extipy-args (list
-                            "--NotebookApp.kernel_manager_class=extipy.ExternalIPythonKernelManager"
-                            "--Session.key=b''")))
-          (pynt-jupyter-server-start extipy-args)
-          (deferred:wait 6000))))
-    (deferred:nextc it
-      (lambda ()
-        (setq pynt-extipy-jupyter-server-conn-info (ein:jupyter-server-conn-info))))))
+        (let* ((server-cmd-path ein:jupyter-default-server-command)
+               (notebook-directory (expand-file-name "~"))
+               (extipy-args '("--NotebookApp.kernel_manager_class=extipy.ExternalIPythonKernelManager"
+                              "--Session.key=b''"))
+               (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
+          (ein:jupyter-server-start server-cmd-path notebook-directory))
+        (deferred:wait 6000)))))
 
-(defun pynt-mode-init ()
+(defun pynt-mode-activate ()
   "Initialize pynt mode."
 
   ;; If the user has already got their notebook and code side-by-side then just
   ;; prompt them to confirm that's the notebook they want to use. Otherwise
   ;; create a new notebook and line it up side-by-side.
   (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
-      (let ((url-or-port (car pynt-default-jupyter-server-conn-info)))
+      (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
         (pynt-new-notebook url-or-port))
     (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
     (call-interactively 'ein:connect-to-notebook-buffer))
@@ -735,13 +717,21 @@ the most recently started jupyter server."
   ;; Deactivate pynt scroll mode
   (pynt-scroll-mode -1))
 
+(defvar pynt-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
+    (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
+    (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
+    (define-key map (kbd "C-c C-k") 'pynt-jack-in)
+    map))
+
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN
 
 \\{pynt-mode-map}"
   :keymap pynt-mode-map
   :lighter "pynt"
-  (if pynt-mode (pynt-mode-init) (pynt-mode-deactivate)))
+  (if pynt-mode (pynt-mode-activate) (pynt-mode-deactivate)))
 
 (defvar pynt-scroll-mode-map
   (let ((map (make-sparse-keymap)))
@@ -761,9 +751,7 @@ the most recently started jupyter server."
     (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
   (setq pynt-nth-cell-instance 0))
 
-(when pynt-start-jupyter-server-on-startup (pynt-start-jupyter-servers))
-
-;; (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py")
+(when pynt-start-jupyter-server-on-startup (pynt-jupyter-server-start))
 
 (provide 'pynt)
 ;;; pynt.el ends here

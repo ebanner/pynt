@@ -76,15 +76,39 @@ import traceback
 import IPython
 from epc.client import EPCClient
 from IPython.core.ultratb import AutoFormattedTB
+import ast
+import inspect
 
 epc_client = EPCClient(('%s', %s), log_traceback=True)
-
 def __cell__(content, buffer_name, cell_type, line_number):
     epc_client.call_sync('make-cell', args=[content, buffer_name, cell_type, line_number])
     time.sleep(0.01)
 
-# __locals__ might have been set from an external python process
-__locals__ = dict() if not '__locals__' in vars() and '__locals__' not in globals() else __locals__
+class LineNumberFinder(ast.NodeTransformer):
+    @staticmethod
+    def _equals(a, b):
+        return abs(a-b) < 2 # FIXME decorators
+    def __init__(self, func_name, lineno):
+        super().__init__()
+        self.func_name = func_name
+        self.lineno = lineno
+    def visit_ClassDef(self, classdef):
+        methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
+        for method in methods:
+            if method.name == self.func_name and self._equals(method.lineno, self.lineno):
+                raise Exception(f'{classdef.name}.{method.name}')
+        return classdef
+    def visit_FunctionDef(self, func):
+        if func.name == self.func_name and self._equals(func.lineno, self.lineno):
+            raise Exception(func.name)
+        return func
+def find_namespace(code, func_name, lineno):
+    try:
+        tree = ast.parse(code)
+        LineNumberFinder(func_name, lineno).visit(tree)
+    except Exception as e:
+        return e.args[0]
+
 tbf = AutoFormattedTB(mode='Plain', tb_offset=1)
 def handler(shell, etype, evalue, tb, tb_offset=None):
     shell.showtraceback((etype, evalue, tb), tb_offset=tb_offset)
@@ -94,14 +118,16 @@ def handler(shell, etype, evalue, tb, tb_offset=None):
             break
         tb = tb.tb_next
     frame_summary, = traceback.extract_tb(tb)
-    epc_client.call_sync('report-exception', args=[frame_summary.name])
     if frame_summary.name == '<module>':
         return
-    global __locals__
-    __locals__ = tb.tb_frame.f_locals
+    lines, _ = inspect.findsource(tb.tb_frame.f_code)
+    code = ''.join(lines)
+    namespace = find_namespace(code, frame_summary.name, tb.tb_frame.f_code.co_firstlineno)
+    epc_client.call_sync('report-exception', args=[namespace])
+    globals().update(tb.tb_frame.f_locals)
     return stb
-
 IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
+
 
 __name__ = '__pynt__'
 
@@ -736,6 +762,8 @@ the most recently started jupyter server."
   (setq pynt-nth-cell-instance 0))
 
 (when pynt-start-jupyter-server-on-startup (pynt-start-jupyter-servers))
+
+;; (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py")
 
 (provide 'pynt)
 ;;; pynt.el ends here

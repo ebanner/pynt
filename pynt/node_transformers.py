@@ -301,7 +301,7 @@ class FunctionExploder(ast.NodeTransformer):
             func.body = func.body[1:]
             parser = doctest.DocTestParser()
             results = parser.parse(docstring)
-            docstring_prefix, docstring_examples = results[0], [result for result in results if isinstance(result, doctest.Example)]
+            docstring_prefix, docstring_examples = results[0].strip(), [result for result in results if isinstance(result, doctest.Example)]
             docstring_assigns = [example.source.strip() for example in docstring_examples]
 
         # filter returns

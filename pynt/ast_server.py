@@ -115,13 +115,13 @@ def parse_namespaces(*code):
     ... y
     ...
     ... '''
-    >>> code = [s, '*ast-server*']
+    >>> code = [s, 'ast-server']
 
     """
     code, namespace = code[0], code[1]
     tree = ast.parse(code)
     new_code = str()
-    star, module_name, star = namespace.split('*')
+    module_name = namespace
     funcs = [stmt for stmt in tree.body if isinstance(stmt, ast.FunctionDef)]
     methods = []
     classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]

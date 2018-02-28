@@ -100,7 +100,7 @@ This variable holds the name of the notebook associated with the
 current pynt-mode session. The value gets set soon after starting
 pynt-mode.
 
-More specifically this variable containes the name of the first
+More specifically this variable contains the name of the first
 EIN worksheet associated with the code buffer.")
 
 (defvar-local pynt-active-namespace ""

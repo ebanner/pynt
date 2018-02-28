@@ -3,6 +3,8 @@
 Emacs minor mode for generating and interacting with jupyter notebooks.
 
 [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
+[![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook)
+[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt)
 
 - [🎥 Feature Tour (YouTube)](https://youtu.be/wtVF5cMhBjg)
 

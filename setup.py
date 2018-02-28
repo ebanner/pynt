@@ -10,5 +10,8 @@ setup(
     license='MIT',
     packages=['codebook'],
     zip_safe=False,
-    scripts=['bin/embed-kernel']
+    scripts=[
+        'bin/pynt-embed',
+        'bin/pynt-serve',
+    ]
 )

@@ -564,9 +564,7 @@ code buffer."
 
 (defun pynt-start-ast-server ()
   "Start python AST server."
-  (let* ((dirname (file-name-directory (symbol-file 'pynt-log)))
-         (ast-server-path (concat dirname "ast_server.py")))
-    (setq pynt-ast-server (epc:start-epc "python" `(,ast-server-path)))))
+  (setq pynt-ast-server (epc:start-epc "pynt-serve" nil)))
 
 (defun pynt-init-epc-client ()
   "Initialize the EPC client for the EIN notebook.

@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 
 import astor
 from epc.server import EPCServer
-from node_transformers import Annotator, FunctionExploder, SyntaxRewriter, IPythonEmbedder, LineNumberFinder
+from codebook.node_transformers import Annotator, FunctionExploder, SyntaxRewriter, IPythonEmbedder, LineNumberFinder
 
 server = EPCServer(('localhost', 0))
 

@@ -128,8 +128,7 @@ def handler(shell, etype, evalue, tb, tb_offset=None):
     return stb
 IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
 
-
-__name__ = '__pynt__'
+__name__ = '%s'
 
 "
   "Python code template which is evaluated early on.
@@ -328,7 +327,7 @@ function completes."
   (setq pynt-namespaces nil
         pynt-worksheet-buffer-names nil
         pynt-namespace-to-region-map (make-hash-table :test 'equal))
-  (pynt-set-active-namespace (format "ns=*%s*" (pynt-get-module-level-namespace)))
+  (pynt-set-active-namespace (format "ns=%s" (pynt-get-module-level-namespace)))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Calling parse_namespaces with pynt-active-namespace = %s" pynt-active-namespace)
@@ -576,7 +575,8 @@ This needs to be done so python can send commands to Emacs to
 create code cells. Use the variables
 `pynt-epc-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
-  (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port)))
+  (pynt-set-active-namespace (format "ns=%s" (pynt-get-module-level-namespace)))
+  (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port pynt-active-namespace)))
     (ein:shared-output-eval-string pynt-init-code)))
 
 (defun pynt-intercept-ein-notebook-name (old-function buffer-or-name)

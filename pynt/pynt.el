@@ -66,6 +66,11 @@ The jupyter server listens on the port defined by the variable
 (defcustom pynt-verbose nil
   "Log pynt debug information if t and do not otherwise.")
 
+(defcustom pynt-project-root "~/mysite/"
+  "Project root to call pynt jack in commands from.
+
+You must put a trailing slash on the end for it to work right!")
+
 (defvar pynt-init-code-template
   "
 
@@ -640,7 +645,18 @@ deactivated."
   "Jack into the current namespace via a command."
   (interactive)
   (set-process-sentinel
-   (start-process "PYNT Kernel" "*pynt-kernel*" "python" "embed.py" "-namespace" pynt-active-namespace "-cmd" cmd)
+   (let* ((project-path (expand-file-name pynt-project-root))
+          (absolute-dir-path (file-name-directory (buffer-file-name)))
+          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
+          (default-directory pynt-project-root))
+     (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
+               (concat relative-dir-path pynt-active-namespace)
+               cmd)
+     (start-process "PYNT Kernel"
+                    "*pynt-kernel*"
+                    "pynt-embed"
+                    "-namespace" (concat relative-dir-path pynt-active-namespace)
+                    "-cmd" cmd))
    'pynt-attach-to-running-kernel-and-exec))
 
 (defun pynt-select-jack-in-command ()

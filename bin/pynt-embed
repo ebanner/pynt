@@ -8,6 +8,7 @@ notebook and talk to it.
 """
 
 import ast
+import os
 import shutil
 import subprocess
 import tempfile
@@ -16,7 +17,7 @@ import astor
 import jupyter_core
 import plac
 
-from node_transformers import IPythonEmbedder
+from codebook.node_transformers import IPythonEmbedder
 
 
 @plac.annotations(
@@ -39,9 +40,14 @@ def main(namespace, cmd):
         - my_module.my_func
         - my_module.MyClass.my_func
 
+    >>> namespace = 'example/biz.bar'
+    >>> cmd = 'python example/biz.py'
+
     """
-    module = namespace.split('.')[0]
-    path = '.'.join([module, 'py'])
+    # Compute path to file
+    dirname, ns = os.path.dirname(namespace), os.path.basename(namespace)
+    module = ns.split('.')[0]
+    path = '.'.join(['/'.join([dirname, module]), 'py'])
 
     # Read in Input File
     with open(path) as f:
@@ -50,7 +56,7 @@ def main(namespace, cmd):
 
     # Embed an IPython Kernel into the Function
     tree = ast.parse(code)
-    t = IPythonEmbedder(namespace).visit(tree)
+    t = IPythonEmbedder(ns).visit(tree)
     code_ = astor.to_source(t)
 
     # Copy the Old File to a Temporary File

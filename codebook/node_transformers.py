@@ -218,7 +218,7 @@ class IPythonEmbedder(ast.NodeTransformer):
                     body=[
                         ast.Import(names=[ast.alias(name='time', asname=None)]),
                         ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1)], keywords=[])),
-                        ast.Expr(value=ast.Call(func=ast.Name(id='exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
+                        ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='_exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
                     ],
                     orelse=[]
                 ),

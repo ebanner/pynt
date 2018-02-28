@@ -1,4 +1,8 @@
 {
+    "biz": [
+        "python biz.py"
+    ],
+
     "biz.bar": [
         "python biz.py",
         "pytest test.py::test_bar"

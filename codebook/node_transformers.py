@@ -97,25 +97,117 @@ class IPythonEmbedder(ast.NodeTransformer):
         """
 
         >>> self = IPythonEmbedder.__new__(IPythonEmbedder)
-        >>> namespace = 'foo.bar'
+        >>> namespace = 'foo'
         >>> __class__ = IPythonEmbedder
 
         """
         super(__class__, self).__init__()
         self.namespace = namespace
         tokens = namespace.split('.')
-        if len(tokens) == 2:
-            module, self.func_name = tokens
+        if len(tokens) == 1:
+            self.module, = tokens
+            self.func_type = 'module'
+        elif len(tokens) == 2:
+            self.module, self.func_name = tokens
             self.func_type = 'function'
         else:
             assert len(tokens) == 3
-            module, self.class_name, self.func_name = tokens
+            self.module, self.class_name, self.func_name = tokens
             self.func_type = 'method'
 
     @staticmethod
-    def _after_method(namespace):
-        super(__class__, self).__init__()
-        self.namespace = namespace
+    def get_kernel_embed():
+        """A list of kernel embed nodes
+
+        Returns:
+            nodes (list): AST nodes which form the following code.
+
+            ```
+            import os
+            try:
+                pid = os.fork()
+            except OSError:
+                exit(1)
+            if pid > 0:
+                import time
+                time.sleep(1)
+                os._exit(0)
+            os.chdir('/')
+            os.setsid()
+            os.umask(0)
+            import IPython
+            IPython.start_kernel(user_ns={**locals(), **globals(), **vars()})
+            ```
+
+        This is a purely functional method which always return the same thing.
+
+        """
+        nodes = [
+            ast.Import(names=[ast.alias(name='os', asname=None)]),
+            ast.Try(
+                body=[
+                    ast.Assign(
+                        targets=[ast.Name(id='pid', ctx=ast.Store())],
+                        value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])),
+                ],
+                handlers=[
+                    ast.ExceptHandler(
+                        type=ast.Name(id='OSError', ctx=ast.Load()),
+                        name=None,
+                        body=[
+                            ast.Expr(
+                                value=ast.Call(
+                                    func=ast.Name(id='exit', ctx=ast.Load()),
+                                    args=[ast.Num(n=1)],
+                                    keywords=[]
+                                )
+                            ),
+                        ]
+                    ),
+                ],
+                orelse=[],
+                finalbody=[]
+            ),
+            ast.If(
+                test=ast.Compare(
+                    left=ast.Name(id='pid', ctx=ast.Load()),
+                    ops=[ast.Gt()],
+                    comparators=[ast.Num(n=0)]
+                ),
+                body=[
+                    ast.Import(names=[ast.alias(name='time', asname=None)]),
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1)], keywords=[])),
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='_exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
+                ],
+                orelse=[]
+            ),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='chdir', ctx=ast.Load()), args=[ast.Str(s='/')], keywords=[])),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
+            ast.Import(names=[ast.alias(name='IPython', asname=None)]),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
+        ]
+        return nodes
+
+    def visit_Module(self, module):
+        """Maybe replace the entire module with a kernel
+
+        If namespace is targeting the top-level then we do it.
+
+        >>> self = IPythonEmbedder(namespace='foo')
+        >>> code = '''
+        ...
+        ... import random
+        ... def foo():
+        ...     pass
+        ...
+        ... '''
+        >>> module = ast.parse(code)
+
+        """
+        if self.func_type == 'module':
+            module.body = self.get_kernel_embed()
+        return module
 
     def visit_ClassDef(self, classdef):
         """Embed a kernel into classdef.target`
@@ -183,52 +275,7 @@ class IPythonEmbedder(ast.NodeTransformer):
         if not func.name == self.func_name:
             node = func
         else:
-            body = [
-                ast.Import(names=[ast.alias(name='os', asname=None)]),
-                ast.Try(
-                    body=[
-                        ast.Assign(
-                            targets=[ast.Name(id='pid', ctx=ast.Store())],
-                            value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])),
-                    ],
-                    handlers=[
-                        ast.ExceptHandler(
-                            type=ast.Name(id='OSError', ctx=ast.Load()),
-                            name=None,
-                            body=[
-                                ast.Expr(
-                                    value=ast.Call(
-                                        func=ast.Name(id='exit', ctx=ast.Load()),
-                                        args=[ast.Num(n=1)],
-                                        keywords=[]
-                                    )
-                                ),
-                            ]
-                        ),
-                    ],
-                    orelse=[],
-                    finalbody=[]
-                ),
-                ast.If(
-                    test=ast.Compare(
-                        left=ast.Name(id='pid', ctx=ast.Load()),
-                        ops=[ast.Gt()],
-                        comparators=[ast.Num(n=0)]
-                    ),
-                    body=[
-                        ast.Import(names=[ast.alias(name='time', asname=None)]),
-                        ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1)], keywords=[])),
-                        ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='_exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
-                    ],
-                    orelse=[]
-                ),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='chdir', ctx=ast.Load()), args=[ast.Str(s='/')], keywords=[])),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
-                ast.Import(names=[ast.alias(name='IPython', asname=None)]),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
-            ]
-            func.body = body
+            func.body = self.get_kernel_embed()
             node = func
         return node
 

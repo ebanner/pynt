@@ -37,17 +37,18 @@ def main(namespace, cmd):
     `namespace` is of the form module.(class.)?[method|func]
 
     Examples:
+        - my_module
         - my_module.my_func
         - my_module.MyClass.my_func
 
-    >>> namespace = 'example/biz.bar'
+    >>> namespace = 'biz.bar'
     >>> cmd = 'python example/biz.py'
 
     """
     # Compute path to file
     dirname, ns = os.path.dirname(namespace), os.path.basename(namespace)
-    module = ns.split('.')[0]
-    path = '.'.join(['/'.join([dirname, module]), 'py'])
+    module = '.'.join([ns.split('.')[0], 'py'])
+    path = '/'.join([dirname, module]) if dirname else module
 
     # Read in Input File
     with open(path) as f:

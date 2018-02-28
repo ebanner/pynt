@@ -11,7 +11,9 @@ import subprocess
 import tempfile
 
 import astor
+import jupyter_core
 import plac
+
 from node_transformers import IPythonEmbedder
 
 
@@ -66,7 +68,8 @@ def main(namespace, cmd):
 
     # Write .pynt to runtime dir so a kernel (re)start will attach to this
     # kernel
-    open('/Users/ebanner/Library/Jupyter/runtime/.pynt', 'a').close()
+    runtime_dir = jupyter_core.paths.jupyter_runtime_dir()
+    open(f'{runtime_dir}/.pynt', 'a').close()
 
 
 if __name__ == '__main__':

@@ -664,16 +664,12 @@ Start it in the user's home directory and use the
 `ExternalIPythonKernelManager' so we can attach to external
 IPython kernels."
   (interactive)
-  (deferred:$
-    (deferred:next
-      (lambda ()
-        (let* ((server-cmd-path ein:jupyter-default-server-command)
-               (notebook-directory (expand-file-name "~"))
-               (extipy-args '("--NotebookApp.kernel_manager_class=extipy.ExternalIPythonKernelManager"
-                              "--Session.key=b''"))
-               (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
-          (ein:jupyter-server-start server-cmd-path notebook-directory))
-        (deferred:wait 6000)))))
+  (let* ((server-cmd-path ein:jupyter-default-server-command)
+         (notebook-directory (expand-file-name "~"))
+         (extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
+                        "--Session.key=b''"))
+         (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
+    (ein:jupyter-server-start server-cmd-path notebook-directory)))
 
 (defun pynt-mode-activate ()
   "Initialize pynt mode."

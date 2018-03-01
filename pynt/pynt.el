@@ -133,8 +133,6 @@ def handler(shell, etype, evalue, tb, tb_offset=None):
     return stb
 IPython.get_ipython().set_custom_exc(exc_tuple=(Exception,), handler=handler)
 
-__name__ = '%s'
-
 "
   "Python code template which is evaluated early on.
 
@@ -579,7 +577,7 @@ create code cells. Use the variables
 `pynt-epc-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
   (pynt-set-active-namespace (format "ns=%s" (pynt-get-module-level-namespace)))
-  (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port pynt-active-namespace)))
+  (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port)))
     (ein:shared-output-eval-string pynt-init-code)))
 
 (defun pynt-intercept-ein-notebook-name (old-function buffer-or-name)

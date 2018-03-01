@@ -1,5 +1,7 @@
 import pypandoc
+
 from setuptools import setup
+
 
 def readme():
     rst = pypandoc.convert_file('README.md', to='rst')

@@ -13,5 +13,11 @@ setup(
     scripts=[
         'bin/pynt-embed',
         'bin/pynt-serve',
+    ],
+    install_requires=[
+        'jupyter',
+        'astor',
+        'plac',
+        'epc'
     ]
 )

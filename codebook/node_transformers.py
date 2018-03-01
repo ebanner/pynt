@@ -17,7 +17,13 @@ def __random_string__():
     return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
 
 def upcase(s):
-    return f'{s[0].upper()}{s[1:]}'
+    """
+
+    >>> s = 'foo'
+
+    """
+    u = f'{s[0].upper()}{s[1:]}'
+    return u
 
 
 class LineNumberFinder(ast.NodeTransformer):
@@ -135,6 +141,10 @@ class IPythonEmbedder(ast.NodeTransformer):
             os.chdir('/')
             os.setsid()
             os.umask(0)
+            import pprint
+            print(f'globals = {pprint.pformat(globals())}')
+            print(f'locals = {pprint.pformat(locals())}')
+            print(f'vars = {pprint.pformat(vars())}')
             import IPython
             IPython.start_kernel(user_ns={**locals(), **globals(), **vars()})
             ```
@@ -184,6 +194,10 @@ class IPythonEmbedder(ast.NodeTransformer):
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='chdir', ctx=ast.Load()), args=[ast.Str(s='/')], keywords=[])),
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
+            ast.Import(names=[ast.alias(name='pprint', asname=None)]),
+            ast.Expr(value=ast.Call(func=ast.Name(id='print', ctx=ast.Load()), args=[ast.JoinedStr(values=[ast.Str(s='globals = '), ast.FormattedValue(value=ast.Call(func=ast.Attribute(value=ast.Name(id='pprint', ctx=ast.Load()), attr='pformat', ctx=ast.Load()), args=[ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[])], keywords=[]), conversion=-1, format_spec=None)])], keywords=[])),
+            ast.Expr(value=ast.Call(func=ast.Name(id='print', ctx=ast.Load()), args=[ast.JoinedStr(values=[ast.Str(s='locals = '), ast.FormattedValue(value=ast.Call(func=ast.Attribute(value=ast.Name(id='pprint', ctx=ast.Load()), attr='pformat', ctx=ast.Load()), args=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[])], keywords=[]), conversion=-1, format_spec=None)])], keywords=[])),
+            ast.Expr(value=ast.Call(func=ast.Name(id='print', ctx=ast.Load()), args=[ast.JoinedStr(values=[ast.Str(s='vars = '), ast.FormattedValue(value=ast.Call(func=ast.Attribute(value=ast.Name(id='pprint', ctx=ast.Load()), attr='pformat', ctx=ast.Load()), args=[ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[])], keywords=[]), conversion=-1, format_spec=None)])], keywords=[])),
             ast.Import(names=[ast.alias(name='IPython', asname=None)]),
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
         ]

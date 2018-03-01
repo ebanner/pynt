@@ -97,7 +97,7 @@ class IPythonEmbedder(ast.NodeTransformer):
         """
 
         >>> self = IPythonEmbedder.__new__(IPythonEmbedder)
-        >>> namespace = 'foo'
+        >>> namespace = 'foo.bar'
         >>> __class__ = IPythonEmbedder
 
         """
@@ -194,7 +194,7 @@ class IPythonEmbedder(ast.NodeTransformer):
 
         If namespace is targeting the top-level then we do it.
 
-        >>> self = IPythonEmbedder(namespace='foo')
+        >>> self = IPythonEmbedder(namespace='foo.foo')
         >>> code = '''
         ...
         ... import random
@@ -207,6 +207,8 @@ class IPythonEmbedder(ast.NodeTransformer):
         """
         if self.func_type == 'module':
             module.body = self.get_kernel_embed()
+        else:
+            module = self.generic_visit(module)
         return module
 
     def visit_ClassDef(self, classdef):

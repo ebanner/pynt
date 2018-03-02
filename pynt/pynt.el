@@ -622,8 +622,8 @@ deactivated."
   (interactive)
   (message "Process: %s had the event %s" process event)
   (with-current-buffer pynt-worksheet-buffer-name
-    (ein:notebook-restart-kernel-command))
-  (sit-for 3)
+    (ein:notebook-restart-kernel ein:%notebook%))
+  (sit-for 1)
   (pynt-init-epc-client)
   (pynt-execute-current-namespace))
 

@@ -151,6 +151,16 @@ pynt mode instances.")
 
 (defvar pynt-ast-server nil "Python AST server")
 
+(defvar-local pynt-module-level-namespace ""
+  "The namespace for the current module.
+
+This variable holds the name of the python module.
+
+Currently it just holds the name of the script minus the \".py\"
+extension, but in the future should contain the package
+name (e.g. package.subpackage.subsubpackage) to avoid namespace
+collisions.")
+
 (defvar-local pynt-worksheet-buffer-name ""
   "The buffer name of the EIN notebook.
 
@@ -233,7 +243,7 @@ will mess with the namespace naming convention that pynt uses."
         `((name . "Select Active Code Region")
           (candidates . ,pynt-namespaces)
           (action . (lambda (namespace)
-                      (with-selected-window (pynt-get-notebook-window) (switch-to-buffer namespace))
+                      (pynt-switch-worksheet namespace)
                       (pynt-narrow-code namespace)
                       (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
                       (message "Type 'C-c C-e' to dump *%s* into the notebook!" namespace))))))
@@ -330,7 +340,7 @@ function completes."
   (setq pynt-namespaces nil
         pynt-worksheet-buffer-names nil
         pynt-namespace-to-region-map (make-hash-table :test 'equal))
-  (pynt-set-active-namespace (format "ns=%s" (pynt-get-module-level-namespace)))
+  (pynt-set-active-namespace (format "ns=%s" pynt-module-level-namespace))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Calling parse_namespaces with pynt-active-namespace = %s" pynt-active-namespace)
@@ -491,10 +501,10 @@ arguments. If the function has arguments then the one in the
 docstring will be the ones that get inserted."
     (multiple-value-bind (namespace-where) args
       (when (not (string= namespace-where "<module>")) ; only jump when exception originated in some other function
-        (let* ((namespace (concat (pynt-get-module-level-namespace) "." namespace-where))
+        (let* ((namespace (concat pynt-module-level-namespace "." namespace-where))
                (namespace-buffer-name (format "ns=%s" namespace)))
           (message "The exception was hit in the namespace = %s" namespace-buffer-name)
-          (with-selected-window (pynt-get-notebook-window) (switch-to-buffer namespace-buffer-name))
+          (pynt-switch-worksheet namespace-buffer-name)
           (pynt-execute-current-namespace)))
       nil))
 
@@ -576,7 +586,7 @@ This needs to be done so python can send commands to Emacs to
 create code cells. Use the variables
 `pynt-epc-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
-  (pynt-set-active-namespace (format "ns=%s" (pynt-get-module-level-namespace)))
+  (pynt-set-active-namespace (format "ns=%s" pynt-module-level-namespace))
   (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port)))
     (ein:shared-output-eval-string pynt-init-code)))
 
@@ -617,7 +627,7 @@ deactivated."
     (with-current-buffer worksheet-name
       (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil))))
 
-(defun pynt-attach-to-running-kernel-and-exec (process event)
+(defun pynt-attach-to-running-kernel (process event)
   "Attach to the most recently started kernel and execute."
   (interactive)
   (message "Process: %s had the event %s" process event)
@@ -625,7 +635,7 @@ deactivated."
     (ein:notebook-restart-kernel ein:%notebook%))
   (sit-for 1)
   (pynt-init-epc-client)
-  (pynt-execute-current-namespace))
+  (pynt-eval-buffer))
 
 (defun pynt-run-all-cells-above ()
   "Execute all cells above and including the cell at point."
@@ -639,23 +649,41 @@ deactivated."
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
 
-(defun pynt-jack-in (cmd)
-  "Jack into the current namespace via a command."
+(defun pynt-jack-in (command)
+  "Jack into the current namespace via a command.
+
+If the command is equal to the
+string\"ein:connect-run-or-eval-buffer\" then just send the
+buffer to EIN. Otherwise make a call out to the external script
+pynt-embed to jack into the desired namespace."
   (interactive)
-  (set-process-sentinel
-   (let* ((project-path (expand-file-name pynt-project-root))
-          (absolute-dir-path (file-name-directory (buffer-file-name)))
-          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
-          (default-directory pynt-project-root))
-     (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
-               (concat relative-dir-path pynt-active-namespace)
-               cmd)
-     (start-process "PYNT Kernel"
-                    "*pynt-kernel*"
-                    "pynt-embed"
-                    "-namespace" (concat relative-dir-path pynt-active-namespace)
-                    "-cmd" cmd))
-   'pynt-attach-to-running-kernel-and-exec))
+  (if (string= command "ein:connect-run-or-eval-buffer")
+      (pynt-eval-buffer)
+    (set-process-sentinel
+     (let* ((project-path (expand-file-name pynt-project-root))
+            (absolute-dir-path (file-name-directory (buffer-file-name)))
+            (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
+            (default-directory pynt-project-root))
+       (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
+                 (concat relative-dir-path pynt-active-namespace)
+                 command)
+       (start-process "PYNT Kernel"
+                      "*pynt-kernel*"
+                      "pynt-embed"
+                      "-namespace" (concat relative-dir-path pynt-active-namespace)
+                      "-cmd" command))
+     'pynt-attach-to-running-kernel)))
+
+(defun pynt-get-jack-in-commands ()
+  "Return the commands for the current namespace.
+
+Commands are in the file \"pynt.json\" in the same directory."
+  (if (file-exists-p "pynt.json")
+      (let* ((namespace-to-cmd-map (json-read-file "pynt.json"))
+             (namespace-cmds (alist-get (intern pynt-active-namespace) namespace-to-cmd-map))
+             (namespace-cmds (append namespace-cmds nil)))
+        namespace-cmds)
+    nil))
 
 (defun pynt-select-jack-in-command ()
   "Select the jack-in command.
@@ -663,9 +691,7 @@ deactivated."
 Available commands include those in the file pynt.json whose key
 is the variable `pynt-active-namespace'."
   (interactive)
-  (let* ((namespace-to-cmd-map (json-read-file "pynt.json"))
-         (namespace-cmds (alist-get (intern pynt-active-namespace) namespace-to-cmd-map))
-         (namespace-cmds (append namespace-cmds nil)))
+  (let* ((namespace-cmds (pynt-get-jack-in-commands)))
     (helm :sources
           `((name . "Select Jack-In Command")
             (candidates . ,namespace-cmds)
@@ -684,6 +710,19 @@ IPython kernels."
                         "--Session.key=b''"))
          (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
     (ein:jupyter-server-start server-cmd-path notebook-directory)))
+
+(defun pynt-eval-buffer ()
+  "Send the buffer to the EIN notebook for evaluation."
+  (let ((current-prefix-arg 4))
+    (call-interactively 'ein:connect-run-or-eval-buffer)))
+
+(defun pynt-switch-worksheet (namespace-buffer-name)
+  "Switch the worksheet in the current view.
+
+ARGUMENT namepsace-buffer-names is a string which contains the
+buffer name of the worksheet to switch to."
+  (with-selected-window (pynt-get-notebook-window)
+    (switch-to-buffer namespace-buffer-name)))
 
 (defun pynt-mode-activate ()
   "Initialize pynt mode."
@@ -704,7 +743,8 @@ IPython kernels."
          (notebook-buffer-name (car notebook-buffer-name-singleton)))
     (setq pynt-buffer-name (buffer-name)
           pynt-worksheet-buffer-name notebook-buffer-name
-          pynt-notebook-to-buffer-map (make-hash-table :test 'equal))
+          pynt-notebook-to-buffer-map (make-hash-table :test 'equal)
+          pynt-module-level-namespace (pynt-get-module-level-namespace))
     (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
 
     ;; Set up EPC and AST servers but only if this is the first time we are
@@ -720,11 +760,21 @@ IPython kernels."
     (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
     (sit-for 2)
     (pynt-init-epc-client)
-    (let ((current-prefix-arg 4)) (call-interactively 'ein:connect-run-or-eval-buffer))
 
     ;; Parse out the code regions so we can select one right away and start
     ;; coding!
-    (pynt-make-namespace-worksheets)))
+    (pynt-make-namespace-worksheets)
+
+    ;; "Jack in" to the appropriate environment so you can start running stuff
+    ;; right away with no additional time required. If there is no pynt.json
+    ;; file then don't do anything.
+    (let* ((commands (pynt-get-jack-in-commands))
+           (command (car commands)))
+      (when command
+        (if (not (string= command "ein:connect-run-or-eval-buffer"))
+            (pynt-jack-in command)
+          (ein:shared-output-eval-string (format "__name__ = '%s'" pynt-module-level-namespace))
+          (pynt-eval-buffer))))))
 
 (defun pynt-mode-deactivate ()
   "Deactivate pynt mode."

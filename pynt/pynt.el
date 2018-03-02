@@ -66,7 +66,7 @@ The jupyter server listens on the port defined by the variable
 (defcustom pynt-verbose nil
   "Log pynt debug information if t and do not otherwise.")
 
-(defcustom pynt-project-root "~/mysite/"
+(defcustom pynt-project-root nil
   "Project root to call pynt jack in commands from.
 
 You must put a trailing slash on the end for it to work right!")
@@ -458,7 +458,7 @@ notebook server to connect to."
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
-    (sit-for 1)))
+    (sit-for 0.1)))
 
 (defun pynt-toggle-debug ()
   "Toggle pynt development mode.
@@ -660,10 +660,11 @@ pynt-embed to jack into the desired namespace."
   (if (string= command "ein:connect-run-or-eval-buffer")
       (pynt-eval-buffer)
     (set-process-sentinel
-     (let* ((project-path (expand-file-name pynt-project-root))
+     (let* ((project-path (or pynt-project-root (vc-root-dir)))
+            (project-path (expand-file-name project-path))
             (absolute-dir-path (file-name-directory (buffer-file-name)))
             (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
-            (default-directory pynt-project-root))
+            (default-directory project-path))
        (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
                  (concat relative-dir-path pynt-active-namespace)
                  command)

@@ -250,8 +250,8 @@ are killing all the cells.
 Do nothing if the worksheet does not exist."
   (interactive)
   (let ((worksheet-buffer-name (pynt-get-worksheet-buffer-name-from namespace)))
-    (when (get-buffer namespace)
-      (with-current-buffer namespace
+    (when (get-buffer worksheet-buffer-name)
+      (with-current-buffer worksheet-buffer-name
         (beginning-of-buffer)
         (condition-case exception
             (while t (call-interactively 'ein:worksheet-kill-cell))
@@ -612,7 +612,7 @@ deactivated."
   (interactive)
   (message "Process: %s had the event %s" process event)
   (ein:notebook-restart-kernel pynt-notebook)
-  (sit-for 1)
+  (sit-for 5)
   (pynt-init-epc-client)
   (pynt-eval-buffer))
 

@@ -27,6 +27,7 @@
 (require 'epc)
 (require 'epcs)
 (require 'ein-jupyter)
+(require 'magit)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -185,13 +186,12 @@ just return the buffer name.
 
 Throw an error if the buffer name has a period in it because that
 will mess with the namespace naming convention that pynt uses."
-  (if (string-suffix-p ".py" (buffer-name))
-      (let ((namespace-tokens (nbutlast (split-string (buffer-name) "\\.py") 1)))
-        (if (or (> (length namespace-tokens) 1)
-                (string-match-p (regexp-quote "=") (car namespace-tokens)))
-            (error "Buffer name cannot contain '.' nor '='.  Rename your buffer and try again!")
-          (car namespace-tokens)))
-    (buffer-name)))
+  (let* ((script-name (file-name-nondirectory (buffer-file-name)))
+         (namespace-tokens (nbutlast (split-string script-name "\\.py") 1)))
+    (if (or (> (length namespace-tokens) 1)
+            (string-match-p (regexp-quote "=") (car namespace-tokens)))
+        (error "Buffer name cannot contain '.' nor '='.  Rename your buffer and try again!")
+      (car namespace-tokens))))
 
 (defun pynt-get-worksheet-buffer-names ()
   "Get the buffer names associated with the worksheets.
@@ -639,7 +639,7 @@ pynt-embed to jack into the desired namespace."
   (if (string= command "ein:connect-run-or-eval-buffer")
       (pynt-eval-buffer)
     (set-process-sentinel
-     (let* ((project-path (or pynt-project-root (vc-root-dir)))
+     (let* ((project-path (or pynt-project-root (magit-toplevel)))
             (project-path (expand-file-name project-path))
             (absolute-dir-path (file-name-directory (buffer-file-name)))
             (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))

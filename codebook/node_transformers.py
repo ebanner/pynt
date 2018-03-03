@@ -528,7 +528,7 @@ class Annotator(ast.NodeTransformer):
             func=ast.Name(id='__cell__', ctx=ast.Load()),
             args=[
                 ast.Str(s=content),
-                ast.Str(s=f'ns={buffer}'),
+                ast.Str(s=f'{buffer}'),
                 ast.Str(s=cell_type),
                 ast.Str(s=lineno),
             ],

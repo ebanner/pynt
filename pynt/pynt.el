@@ -151,56 +151,8 @@ pynt mode instances.")
 
 (defvar pynt-ast-server nil "Python AST server")
 
-(defvar-local pynt-module-level-namespace ""
-  "The namespace for the current module.
-
-This variable holds the name of the python module.
-
-Currently it just holds the name of the script minus the \".py\"
-extension, but in the future should contain the package
-name (e.g. package.subpackage.subsubpackage) to avoid namespace
-collisions.")
-
-(defvar-local pynt-worksheet-buffer-name ""
-  "The buffer name of the EIN notebook.
-
-This variable holds the name of the notebook associated with the
-current pynt mode session. The value gets set soon after starting
-pynt mode.
-
-More specifically this variable containes the name of the first
-EIN worksheet associated with the code buffer.")
-
-(defvar-local pynt-active-namespace ""
-  "The namespace which corresponds to the code region of interest.
-
-This variable is sent to the python AST server to inform it which
-region of code to filter down to. It is used to set the value of
-the variable `pynt-active-namespace-buffer-name'.
-
-This variable is set by the `pynt-select-namespace' command.")
-
-(defvar-local pynt-active-namespace-buffer-name (format "ns=%s" pynt-active-namespace)
-  "The buffer name of the active namespace.
-
-When you run the command `pynt-execute-current-namespace' this is the
-buffer that will have code cells added to it and evaluated. Is
-always of the form \"ns=`pynt-active-namespace'\".
-
-More specifically this variable contains the name of the EIN
-worksheet buffer associated with the active namespace region of
-code.")
-
-(defvar-local pynt-namespaces nil
-  "List of namespaces in the code buffer.
-
-This variable is set by the command
-`pynt-make-namespace-worksheets'. These namespaces will then be
-available for selection via the `pynt-select-namespace'
-command.")
-
-(defvar-local pynt-worksheet-buffer-names nil
-  "List of buffer names in the EIN notebook associated with the code buffer.")
+(defvar-local pynt-notebook nil
+  "Reference to the EIN notebook.")
 
 (defvar-local pynt-line-to-cell-map nil
   "Map of source code lines to EIN cell(s).
@@ -219,7 +171,12 @@ but does serve as a way to intuitively select a region of code.
 This map is used after a user changes the active namespace via
 the command `pynt-select-namespace'.")
 
-(defun pynt-get-module-level-namespace ()
+(defun pynt-notebook-buffer-name ()
+  "Get the buffer name of the EIN notebook."
+  (let ((notebook-buffer (ein:notebook-buffer pynt-notebook)))
+    (buffer-name notebook-buffer)))
+
+(defun pynt-module-name ()
   "Extract the module-level name of the pynt code buffer.
 
 If the buffer is associated with a python file then chop off the
@@ -236,16 +193,34 @@ will mess with the namespace naming convention that pynt uses."
           (car namespace-tokens)))
     (buffer-name)))
 
+(defun pynt-get-worksheet-buffer-names ()
+  "Get the buffer names associated with the worksheets.
+
+Note we cannot simply use the function
+`ein:worksheet--buffer-name' since we rename the buffers and the
+reference appears to get stale. Hence a layer of indirection is
+required where we need to get references to the buffers
+themselves and then ask them for their names."
+  (let* ((worksheet-buffers (mapcar 'ein:worksheet--get-buffer (ein:$notebook-worksheets pynt-notebook)))
+         (worksheet-buffer-names (mapcar 'buffer-name worksheet-buffers)))
+    worksheet-buffer-names))
+
+(defun pynt-get-namespaces ()
+    "Get all of the namespaces.
+
+Query the EIN notebook and don't call out to the AST server for
+them."
+  (mapcar 'file-name-nondirectory (cdr (pynt-get-worksheet-buffer-names))))
+
 (defun pynt-select-namespace ()
   "Switch the active code region by selecting from a list of namespaces."
   (interactive)
   (helm :sources
         `((name . "Select Active Code Region")
-          (candidates . ,pynt-namespaces)
+          (candidates . ,(pynt-get-namespaces))
           (action . (lambda (namespace)
-                      (pynt-switch-worksheet namespace)
+                      (pynt-switch-to-worksheet namespace)
                       (pynt-narrow-code namespace)
-                      (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
                       (message "Type 'C-c C-e' to dump *%s* into the notebook!" namespace))))))
 
 (defun pynt-get-notebook-window ()
@@ -255,10 +230,9 @@ A reference to this window cannot be cached into a variable
 because if users delete the window and then bring it back up,
 it's a different window now."
   (interactive)
-  (let* ((notebook-buffer-names (append (list pynt-worksheet-buffer-name) pynt-worksheet-buffer-names))
-         (active-notebook-buffer-names-singleton (seq-filter 'get-buffer-window notebook-buffer-names))
-         (active-notebook-buffer-name (car active-notebook-buffer-names-singleton)))
-    (get-buffer-window active-notebook-buffer-name)))
+  (multiple-value-bind (worksheet-buffer-name)
+      (seq-filter 'get-buffer-window (pynt-get-worksheet-buffer-names))
+    (get-buffer-window worksheet-buffer-name)))
 
 (defun pynt-log (&rest args)
   "Log the message when the variable `pynt-verbose' is t.
@@ -267,19 +241,21 @@ Optional argument ARGS the arguments you would normally pass to the function `me
   (when pynt-verbose
     (apply #'message args)))
 
-(defun pynt-kill-cells (worksheet-buffer-name)
-  "Delete all the cells in the worksheet.
+(defun pynt-kill-cells (namespace)
+  "Delete all the cells in the NAMESPACE worksheet.
 
-Do nothing if the buffer does not exist.
+Argument NAMESPACE is the namespace of the worksheet for which we
+are killing all the cells.
 
-Argument WORKSHEET-BUFFER-NAME the buffer name of the worksheet for which we are killing all the cells."
+Do nothing if the worksheet does not exist."
   (interactive)
-  (when (get-buffer worksheet-buffer-name)
-    (with-current-buffer worksheet-buffer-name
-      (beginning-of-buffer)
-      (condition-case exception
-          (while t (call-interactively 'ein:worksheet-kill-cell))
-        ('error)))))
+  (let ((worksheet-buffer-name (pynt-get-worksheet-buffer-name-from namespace)))
+    (when (get-buffer namespace)
+      (with-current-buffer namespace
+        (beginning-of-buffer)
+        (condition-case exception
+            (while t (call-interactively 'ein:worksheet-kill-cell))
+          ('error))))))
 
 (defun pynt-kill-all-cells ()
   "Kill cells in all EIN worksheets.
@@ -289,12 +265,10 @@ shortly after calling the function
 `pynt-make-namespace-worksheets' to start them each with a blank
 slate."
   (interactive)
-  (let* ((buffer-names (mapcar 'buffer-name (buffer-list)))
-         (worksheet-names (seq-filter (lambda (buffer-name) (string-prefix-p "ns=" buffer-name)) buffer-names)))
-    (dolist (worksheet-name worksheet-names)
-      (pynt-kill-cells worksheet-name))))
+  (dolist (worksheet-name (pynt-get-worksheet-buffer-names))
+    (pynt-kill-cells worksheet-name)))
 
-(defun pynt-get-buffer-names-in-active-frame ()
+(defun pynt-get-buffer-names-in-frame ()
   "Get the buffer names in the active frame.
 
 This function is mostly userd to query the active frame for the
@@ -305,13 +279,13 @@ active namespace."
          (buffer-names (mapcar 'buffer-name buffers)))
     buffer-names))
 
-(defun pynt-get-active-namespace-buffer-name ()
-  "Return the name of the active namespace.
+(defun pynt-get-worksheet-buffer-name ()
+  "Return the worksheet buffer name in this frame.
 
 The active namespace will have a buffer in the active frame and
-will have the prefix 'ns='.  If there is no such window then
-an error is thrown."
-  (let* ((buffer-names (pynt-get-buffer-names-in-active-frame))
+will have the prefix 'ns='. If there is no such window then an
+error is thrown."
+  (let* ((buffer-names (pynt-get-buffer-names-in-frame))
          (active-buffer-singleton (seq-filter
                                    (lambda (buffer-name) (string-prefix-p "ns=" buffer-name))
                                    buffer-names))
@@ -320,14 +294,13 @@ an error is thrown."
         (error "No window in the current frame whose buffer name is prefixed with 'ns='!")
       active-buffer-name)))
 
-(defun pynt-set-active-namespace (ns-buffer-name)
-  "Set the active namespace to NS-BUFFER-NAME.
+(defun pynt-get-active-namespace ()
+  "Return the name of the active namespace.
 
-This function sets the variables `pynt-active-namespace-buffer-name' and
-`pynt-active-namespace' accordingly."
-  (setq pynt-active-namespace-buffer-name ns-buffer-name)
-  (let ((namespace-singleton (split-string pynt-active-namespace-buffer-name "ns=")))
-    (setq pynt-active-namespace (cadr namespace-singleton))))
+The active namespace is the buffer name of the window in the
+active frame sans the leading \"ns=\"."
+  (multiple-value-bind (empty namespace) (split-string (pynt-get-worksheet-buffer-name) "ns=")
+    (file-name-nondirectory namespace)))
 
 (defun pynt-make-namespace-worksheets ()
   "Parse out the namespaces and create namespace worksheets.
@@ -336,15 +309,12 @@ This is the last function called after activating pynt mode. The
 command `pynt-select-namespace' is ready to be called after this
 function completes."
   (interactive)
-  (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
-  (setq pynt-namespaces nil
-        pynt-worksheet-buffer-names nil
-        pynt-namespace-to-region-map (make-hash-table :test 'equal))
-  (pynt-set-active-namespace (format "ns=%s" pynt-module-level-namespace))
+  (dolist (worksheet-buffer-name (cdr (pynt-get-worksheet-buffer-names))) ; don't delete the first one!
+    (pynt-delete-worksheet worksheet-buffer-name))
+  (setq pynt-namespace-to-region-map (make-hash-table :test 'equal))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (pynt-log "Calling parse_namespaces with pynt-active-namespace = %s" pynt-active-namespace)
-      (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,pynt-active-namespace))
+      (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,(pynt-module-name)))
       (deferred:nextc it
         (lambda (namespaces)
           (pynt-log "Namespaces = %s" namespaces)
@@ -354,8 +324,16 @@ function completes."
                 (progn
                   (pynt-create-new-worksheet name)
                   (pynt-kill-cells name)
-                  (setq pynt-namespaces (append pynt-namespaces (list name)))
                   (puthash name (list (buffer-name) start-line end-line) pynt-namespace-to-region-map))))))))))
+
+(defun pynt-get-worksheet-buffer-name-from (namespace)
+  "Compute the worksheet buffer name from a namespace.
+
+The resulting buffer name concatentates the current directory
+with namespace.
+
+Argument NAMESPACE is the namespace."
+  (concat "ns=" default-directory namespace))
 
 (defun pynt-execute-current-namespace ()
   "Dump the code in `pynt-active-namespace' into its EIN worksheet buffer.
@@ -366,12 +344,11 @@ is sent to the IPython kernel to be executed."
   (interactive)
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
   (widen)
-  (pynt-set-active-namespace (pynt-get-active-namespace-buffer-name))
-  (pynt-kill-cells pynt-active-namespace-buffer-name)
+  (pynt-kill-cells (pynt-get-active-namespace))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (pynt-log "Calling python AST server with active namespace = %s ..." pynt-active-namespace)
-      (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-active-namespace))
+      (pynt-log "Calling python AST server with active namespace = %s ..." (pynt-get-active-namespace))
+      (epc:call-deferred pynt-ast-server 'annotate `(,code ,(pynt-get-active-namespace)))
       (deferred:nextc it
         (lambda (annotated-code)
           (pynt-log "Annotated code = %S" annotated-code)
@@ -400,8 +377,8 @@ don't want to worry about at this time."
               (let* ((cell (nth pynt-nth-cell-instance cells))
                      (cell-marker (ein:cell-location cell :input))
                      (point-line (count-screen-lines (window-start) (point)))
-                     (window (get-buffer-window pynt-active-namespace-buffer-name)))
-                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) pynt-active-namespace-buffer-name))
+                     (window (get-buffer-window (pynt-get-worksheet-buffer-name))))
+                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) (pynt-get-worksheet-buffer-name)))
                   (select-window window)
                   (widen)
                   (goto-char cell-marker)
@@ -458,7 +435,7 @@ notebook server to connect to."
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
-    (sit-for 0.1)))
+    (sit-for 1)))
 
 (defun pynt-toggle-debug ()
   "Toggle pynt development mode.
@@ -471,17 +448,22 @@ data structures they print and do not lock up emacs."
         print-length (if print-length nil 1)
         print-circle (if print-circle nil t)))
 
-(defun pynt-create-new-worksheet (buffer-name)
-  "Create a new worksheet in the `pynt-worksheet-buffer-name' notebook.
+(defun pynt-create-new-worksheet (namespace)
+  "Create a new worksheet in the EIN notebook.
 
-Argument BUFFER-NAME the name of the buffer to create a new worksheet in."
+Argument NAMESPACE the name of the namespace to create a
+worksheet for.
+
+The buffer name will be $PWD/namespace in order to avoid emacs
+buffer naming collisions for having the same file name in
+different directories."
   (interactive)
-  (setq pynt-worksheet-buffer-names (append pynt-worksheet-buffer-names (list buffer-name)))
-  (save-excursion
-    (save-window-excursion
-      (with-current-buffer pynt-worksheet-buffer-name
-        (call-interactively 'ein:notebook-worksheet-insert-next)
-        (rename-buffer buffer-name)))))
+  (let ((new-worksheet-buffer-name (pynt-get-worksheet-buffer-name-from namespace)))
+    (save-excursion
+      (save-window-excursion
+        (with-current-buffer (pynt-notebook-buffer-name)
+          (call-interactively 'ein:notebook-worksheet-insert-next)
+          (rename-buffer new-worksheet-buffer-name))))))
 
 (defun pynt-start-epc-server ()
   "Start the EPC server and register its associated callback.
@@ -501,10 +483,10 @@ arguments. If the function has arguments then the one in the
 docstring will be the ones that get inserted."
     (multiple-value-bind (namespace-where) args
       (when (not (string= namespace-where "<module>")) ; only jump when exception originated in some other function
-        (let* ((namespace (concat pynt-module-level-namespace "." namespace-where))
+        (let* ((namespace (concat (pynt-module-name) "." namespace-where))
                (namespace-buffer-name (format "ns=%s" namespace)))
           (message "The exception was hit in the namespace = %s" namespace-buffer-name)
-          (pynt-switch-worksheet namespace-buffer-name)
+          (pynt-switch-to-worksheet namespace-buffer-name)
           (pynt-execute-current-namespace)))
       nil))
 
@@ -561,7 +543,7 @@ code buffer."
   ;; These variables are buffer local so we need to grab them before switching
   ;; over to the worksheet buffer.
   (setq new-cell nil)                   ; new cell to be added
-  (with-current-buffer buffer-name
+  (with-current-buffer (pynt-get-worksheet-buffer-name-from buffer-name)
     (end-of-buffer)
     (call-interactively 'ein:worksheet-insert-cell-below)
     (insert expr)
@@ -586,7 +568,6 @@ This needs to be done so python can send commands to Emacs to
 create code cells. Use the variables
 `pynt-epc-server-hostname' and `pynt-epc-port' to define
 the communication channels for the EPC client."
-  (pynt-set-active-namespace (format "ns=%s" pynt-module-level-namespace))
   (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port)))
     (ein:shared-output-eval-string pynt-init-code)))
 
@@ -598,7 +579,6 @@ So pynt mode can grab the buffer name of the main worksheet.
 Argument OLD-FUNCTION the function we are wrapping.
 Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
-  (setq pynt-worksheet-buffer-name buffer-or-name)
   (apply old-function (list buffer-or-name)))
 
 (defun pynt-narrow-code (namespace)
@@ -628,11 +608,10 @@ deactivated."
       (ein:notebook-worksheet-delete (ein:notebook--get-nb-or-error) (ein:worksheet--get-ws-or-error) nil))))
 
 (defun pynt-attach-to-running-kernel (process event)
-  "Attach to the most recently started kernel and execute."
+  "Attach to the most recently started kernel."
   (interactive)
   (message "Process: %s had the event %s" process event)
-  (with-current-buffer pynt-worksheet-buffer-name
-    (ein:notebook-restart-kernel ein:%notebook%))
+  (ein:notebook-restart-kernel pynt-notebook)
   (sit-for 1)
   (pynt-init-epc-client)
   (pynt-eval-buffer))
@@ -666,22 +645,22 @@ pynt-embed to jack into the desired namespace."
             (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
             (default-directory project-path))
        (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
-                 (concat relative-dir-path pynt-active-namespace)
+                 (concat relative-dir-path (pynt-module-name))
                  command)
        (start-process "PYNT Kernel"
                       "*pynt-kernel*"
                       "pynt-embed"
-                      "-namespace" (concat relative-dir-path pynt-active-namespace)
+                      "-namespace" (concat relative-dir-path (pynt-module-name))
                       "-cmd" command))
      'pynt-attach-to-running-kernel)))
 
-(defun pynt-get-jack-in-commands ()
+(defun pynt-get-jack-in-commands (&optional namespace)
   "Return the commands for the current namespace.
 
 Commands are in the file \"pynt.json\" in the same directory."
   (if (file-exists-p "pynt.json")
       (let* ((namespace-to-cmd-map (json-read-file "pynt.json"))
-             (namespace-cmds (alist-get (intern pynt-active-namespace) namespace-to-cmd-map))
+             (namespace-cmds (alist-get (intern (or namespace (pynt-get-active-namespace))) namespace-to-cmd-map))
              (namespace-cmds (append namespace-cmds nil)))
         namespace-cmds)
     nil))
@@ -717,13 +696,14 @@ IPython kernels."
   (let ((current-prefix-arg 4))
     (call-interactively 'ein:connect-run-or-eval-buffer)))
 
-(defun pynt-switch-worksheet (namespace-buffer-name)
+(defun pynt-switch-to-worksheet (namespace)
   "Switch the worksheet in the current view.
 
 ARGUMENT namepsace-buffer-names is a string which contains the
 buffer name of the worksheet to switch to."
-  (with-selected-window (pynt-get-notebook-window)
-    (switch-to-buffer namespace-buffer-name)))
+  (let ((worksheet-buffer-name (pynt-get-worksheet-buffer-name-from namespace)))
+    (with-selected-window (pynt-get-notebook-window)
+      (switch-to-buffer worksheet-buffer-name))))
 
 (defun pynt-mode-activate ()
   "Initialize pynt mode."
@@ -731,7 +711,7 @@ buffer name of the worksheet to switch to."
   ;; If the user has already got their notebook and code side-by-side then just
   ;; prompt them to confirm that's the notebook they want to use. Otherwise
   ;; create a new notebook and line it up side-by-side.
-  (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
+  (if (not (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame)))
       (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
         (pynt-new-notebook url-or-port))
     (advice-add #'ein:connect-to-notebook-buffer :around #'pynt-intercept-ein-notebook-name)
@@ -739,14 +719,11 @@ buffer name of the worksheet to switch to."
 
   ;; Capture the code buffer name, worksheet buffer name, and maps that will
   ;; link lines of code to their corresponding cells for scrolling.
-  (let* ((notebook-buffer-name-singleton
-          (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-active-frame)))
-         (notebook-buffer-name (car notebook-buffer-name-singleton)))
-    (setq pynt-buffer-name (buffer-name)
-          pynt-worksheet-buffer-name notebook-buffer-name
-          pynt-notebook-to-buffer-map (make-hash-table :test 'equal)
-          pynt-module-level-namespace (pynt-get-module-level-namespace))
-    (puthash pynt-worksheet-buffer-name pynt-buffer-name pynt-notebook-to-buffer-map)
+  (multiple-value-bind (notebook-buffer-name)
+      (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame))
+    (setq notebook nil)
+    (with-current-buffer notebook-buffer-name (setq notebook ein:%notebook%))
+    (setq pynt-notebook notebook))
 
     ;; Set up EPC and AST servers but only if this is the first time we are
     ;; starting pynt mode in this emacs session!
@@ -758,7 +735,7 @@ buffer name of the worksheet to switch to."
     ;; over to the notebook kernel to get top-level definitions defined, and
     ;; initialize an EPC client in that notebook so it can talk to the EPC
     ;; server.
-    (ein:connect-to-notebook-buffer pynt-worksheet-buffer-name)
+    (ein:connect-to-notebook-buffer (pynt-notebook-buffer-name))
     (sit-for 2)
     (pynt-init-epc-client)
 
@@ -769,13 +746,13 @@ buffer name of the worksheet to switch to."
     ;; "Jack in" to the appropriate environment so you can start running stuff
     ;; right away with no additional time required. If there is no pynt.json
     ;; file then don't do anything.
-    (let* ((commands (pynt-get-jack-in-commands))
+    (let* ((commands (pynt-get-jack-in-commands (pynt-module-name)))
            (command (car commands)))
       (when command
         (if (not (string= command "ein:connect-run-or-eval-buffer"))
             (pynt-jack-in command)
           (ein:shared-output-eval-string (format "__name__ = '%s'" pynt-module-level-namespace))
-          (pynt-eval-buffer))))))
+          (pynt-eval-buffer)))))
 
 (defun pynt-mode-deactivate ()
   "Deactivate pynt mode."
@@ -784,9 +761,9 @@ buffer name of the worksheet to switch to."
   (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
 
   ;; Remove notebook worksheets and pynt window
-  (dolist (worksheet-buffer-name pynt-worksheet-buffer-names) (pynt-delete-worksheet worksheet-buffer-name))
+  (dolist (worksheet-buffer-name (cdr (pynt-get-worksheet-buffer-names))) (pynt-delete-worksheet worksheet-buffer-name))
   (delete-window (pynt-get-notebook-window))
-  (pynt-delete-worksheet pynt-worksheet-buffer-name)
+  (pynt-delete-worksheet (pynt-notebook-buffer-name))
 
   ;; Deactivate pynt scroll mode
   (pynt-scroll-mode -1))

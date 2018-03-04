@@ -628,6 +628,20 @@ deactivated."
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
 
+(defun pynt-get-project-root ()
+  "Get the project root.
+
+Use the variable `pynt-project-root' first. If that is not set
+then ask magit for the closest enclosing github repo root."
+  (or pynt-project-root (magit-toplevel)))
+
+(defun pynt-relative-curdir-path ()
+  "Relative path of the current directory from the project root."
+  (let* ((project-path (expand-file-name (pynt-get-project-root)))
+         (absolute-dir-path (file-name-directory (buffer-file-name)))
+         (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
+    relative-dir-path))
+
 (defun pynt-jack-in (command)
   "Jack into the current namespace via a command.
 
@@ -639,31 +653,29 @@ pynt-embed to jack into the desired namespace."
   (if (string= command "ein:connect-run-or-eval-buffer")
       (pynt-eval-buffer)
     (set-process-sentinel
-     (let* ((project-path (or pynt-project-root (magit-toplevel)))
-            (project-path (expand-file-name project-path))
-            (absolute-dir-path (file-name-directory (buffer-file-name)))
-            (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path))
-            (default-directory project-path))
+     (let* ((default-directory (pynt-get-project-root)))
        (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
-                 (concat relative-dir-path (pynt-module-name))
+                 (concat (pynt-relative-curdir-path) (pynt-module-name))
                  command)
        (start-process "PYNT Kernel"
                       "*pynt-kernel*"
                       "pynt-embed"
-                      "-namespace" (concat relative-dir-path (pynt-module-name))
+                      "-namespace" (concat (pynt-relative-curdir-path) (pynt-module-name))
                       "-cmd" command))
      'pynt-attach-to-running-kernel)))
 
 (defun pynt-get-jack-in-commands (&optional namespace)
   "Return the commands for the current namespace.
 
-Commands are in the file \"pynt.json\" in the same directory."
-  (if (file-exists-p "pynt.json")
-      (let* ((namespace-to-cmd-map (json-read-file "pynt.json"))
-             (namespace-cmds (alist-get (intern (or namespace (pynt-get-active-namespace))) namespace-to-cmd-map))
+Commands are in \"pynt-project-dir/pynt.json\"."
+  (let ((pynt-config-file (concat (pynt-get-project-root) "pynt.json")))
+    (when (file-exists-p pynt-config-file)
+      (let* ((namespace-to-cmd-map (json-read-file pynt-config-file))
+             (namespace (or namespace (pynt-get-active-namespace)))
+             (namespace-path (concat (pynt-relative-curdir-path) namespace))
+             (namespace-cmds (alist-get (intern namespace-path) namespace-to-cmd-map))
              (namespace-cmds (append namespace-cmds nil)))
-        namespace-cmds)
-    nil))
+        namespace-cmds))))
 
 (defun pynt-select-jack-in-command ()
   "Select the jack-in command.

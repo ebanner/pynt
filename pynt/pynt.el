@@ -664,18 +664,29 @@ pynt-embed to jack into the desired namespace."
                       "-cmd" command))
      'pynt-attach-to-running-kernel)))
 
-(defun pynt-get-jack-in-commands (&optional namespace)
-  "Return the commands for the current namespace.
+(defun pynt-config-file ()
+  "Return a path to the project config file."
+  (concat (pynt-get-project-root) "pynt.json"))
 
-Commands are in \"pynt-project-dir/pynt.json\"."
-  (let ((pynt-config-file (concat (pynt-get-project-root) "pynt.json")))
-    (when (file-exists-p pynt-config-file)
-      (let* ((namespace-to-cmd-map (json-read-file pynt-config-file))
-             (namespace (or namespace (pynt-get-active-namespace)))
-             (namespace-path (concat (pynt-relative-curdir-path) namespace))
-             (namespace-cmds (alist-get (intern namespace-path) namespace-to-cmd-map))
-             (namespace-cmds (append namespace-cmds nil)))
-        namespace-cmds))))
+(defun pynt-get-jack-in-commands (&optional namespace)
+  "Return the commands for NAMESPACE.
+
+Commands are in \"pynt-project-dir/pynt.json\".
+
+The argument NAMESPACE is the namespace to get the jack in
+commands for. If NAMESPACE is not provided then default to the
+active namespace.
+
+If there are no jack in commands for NAMESPACE then look for look
+for the default jack in commands identified by the identifier
+\"*\"."
+  (let* ((namespace-to-cmd-map (json-read-file (pynt-config-file)))
+         (namespace (or namespace (pynt-get-active-namespace)))
+         (namespace (concat (pynt-relative-curdir-path) namespace))
+         (namespace (intern namespace))
+         (namespace-cmds (alist-get namespace namespace-to-cmd-map))
+         (namespace-cmds (or namespace-cmds (alist-get '* namespace-to-cmd-map))))
+    (append namespace-cmds nil)))
 
 (defun pynt-select-jack-in-command ()
   "Select the jack-in command.
@@ -755,11 +766,9 @@ buffer name of the worksheet to switch to."
     ;; coding!
     (pynt-make-namespace-worksheets)
 
-    ;; "Jack in" to the appropriate environment so you can start running stuff
-    ;; right away with no additional time required. If there is no pynt.json
-    ;; file then don't do anything.
-    (let* ((commands (pynt-get-jack-in-commands (pynt-module-name)))
-           (command (car commands)))
+    ;; Jack in to the appropriate environment so you can start running stuff
+    ;; right away with no additional effort required.
+    (let ((command (car (pynt-get-jack-in-commands (pynt-module-name)))))
       (when command
         (if (not (string= command "ein:connect-run-or-eval-buffer"))
             (pynt-jack-in command)

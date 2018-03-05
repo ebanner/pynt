@@ -642,7 +642,7 @@ then ask magit for the closest enclosing github repo root."
          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
     relative-dir-path))
 
-(defun pynt-jack-in (command)
+(defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
 
 If the command is equal to the
@@ -653,14 +653,14 @@ pynt-embed to jack into the desired namespace."
   (if (string= command "ein:connect-run-or-eval-buffer")
       (pynt-eval-buffer)
     (set-process-sentinel
-     (let* ((default-directory (pynt-get-project-root)))
-       (pynt-log "Calling pynt-embed -namespace %s -cmd %s..."
-                 (concat (pynt-relative-curdir-path) (pynt-module-name))
-                 command)
+     (let* ((default-directory (pynt-get-project-root))
+            (namespace (or namespace (pynt-get-active-namespace)))
+            (namespace-path (concat (pynt-relative-curdir-path) namespace)))
+       (pynt-log "Calling pynt-embed -namespace %s -cmd %s..." namespace-path command)
        (start-process "PYNT Kernel"
                       "*pynt-kernel*"
                       "pynt-embed"
-                      "-namespace" (concat (pynt-relative-curdir-path) (pynt-module-name))
+                      "-namespace" namespace-path
                       "-cmd" command))
      'pynt-attach-to-running-kernel)))
 
@@ -771,7 +771,7 @@ buffer name of the worksheet to switch to."
     (let ((command (car (pynt-get-jack-in-commands (pynt-module-name)))))
       (when command
         (if (not (string= command "ein:connect-run-or-eval-buffer"))
-            (pynt-jack-in command)
+            (pynt-jack-in command (pynt-module-name))
           (ein:shared-output-eval-string (format "__name__ = '%s'" pynt-module-level-namespace))
           (pynt-eval-buffer)))))
 

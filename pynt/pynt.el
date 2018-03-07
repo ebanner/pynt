@@ -222,9 +222,12 @@ themselves and then ask them for their names."
         (lambda (namespaces)
           (helm :sources
                 `((name . "Select Active Code Region")
-                  (candidates . ,(mapcar 'car namespaces))
+                  (candidates . ,namespaces)
                   (action . (lambda (namespace)
-                              (pynt-switch-or-init namespace))))))))))
+                              (multiple-value-bind (name start-line end-line) namespace
+                                (goto-line start-line)
+                                (recenter 0)
+                                (pynt-switch-or-init name)))))))))))
 
 (defun pynt-recover-notebook-window ()
   "Recover the notebook window.
@@ -322,27 +325,6 @@ The active namespace is the buffer name of the window in the
 active frame sans the leading \"ns=\"."
   (multiple-value-bind (empty namespace) (split-string (pynt-get-worksheet-buffer-name) "ns=")
     (file-name-nondirectory namespace)))
-
-(defun pynt-make-namespace-worksheet (namespace)
-  "Parse out the namespaces and create namespace worksheets.
-
-This is the last function called after activating pynt mode. The
-command `pynt-select-namespace' is ready to be called after this
-function completes."
-  (interactive)
-  (let ((code (buffer-substring-no-properties (point-min) (point-max))))
-    (deferred:$
-      (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,(pynt-module-name)))
-      (deferred:nextc it
-        (lambda (namespaces)
-          (pynt-log "Namespaces = %s" namespaces)
-          (dolist (namespace namespaces)
-            (multiple-value-bind (name start-line end-line) namespace
-              (when (not (get-buffer name))
-                (progn
-                  (pynt-create-new-worksheet name)
-                  (pynt-kill-cells name)
-                  (puthash name (list (buffer-name) start-line end-line) pynt-namespace-to-region-map))))))))))
 
 (defun pynt-namespace-to-buffer-name (namespace)
   "Compute the worksheet buffer name from a namespace.

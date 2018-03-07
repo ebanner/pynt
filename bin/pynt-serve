@@ -133,10 +133,9 @@ def parse_namespaces(*code):
                 continue
             methods.append([classdef, expr])
     namespaces = \
-        [(f'{module_name}', -1, -1)] + \
-        [(f'{module_name}.{func.name}', func.lineno, func.body[-1].lineno) for func in funcs] + \
-        [(f'{module_name}.{classdef.name}.{method.name}', method.lineno, method.body[-1].lineno) for classdef, method in methods]
-    namespaces = list(reversed(namespaces))
+        [(ns, ns, -1, -1) for ns in [f'{module_name}']] + \
+        [(ns, ns, func.lineno, func.body[-1].lineno) for func in funcs for ns in [f'{module_name}.{func.name}']] + \
+        [(ns, ns, method.lineno, method.body[-1].lineno) for classdef, method in methods for ns in [f'{module_name}.{classdef.name}.{method.name}']]
     return namespaces
 
 @server.register_function

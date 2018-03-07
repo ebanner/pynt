@@ -361,12 +361,12 @@ class FunctionExploder(ast.NodeTransformer):
         # filter returns
         func.body = [stmt for stmt in func.body if not isinstance(stmt, ast.Return)]
 
-        # augment body with docstring
+        # insert function name and docstring san doctests
         exprs = []
         exprs.append(
             Annotator.make_annotation(
                 buffer=self.buffer,
-                content=func.name,
+                content=f'`{func.name}`',
                 cell_type='1',
                 lineno=func.lineno
             )
@@ -375,14 +375,20 @@ class FunctionExploder(ast.NodeTransformer):
             exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
 
         # keyword (default) values
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Keyword Argument Assignments', cell_type='1'))
         vars, values = reversed(func.args.args), reversed(func.args.defaults)
         for var, value in zip(vars, values):
-            assign = ast.Assign(
-                targets=[ast.Name(id=var.arg, ctx=ast.Store())],
-                value=value
+            try_ = ast.Try(
+                body=[ast.Expr(value=ast.Name(id=var.arg, ctx=ast.Load()))],
+                handlers=[
+                    ast.ExceptHandler(
+                        type=ast.Name(id='NameError', ctx=ast.Load()),
+                        name=None,
+                        body=[ast.Assign(targets=[ast.Name(id=var.arg, ctx=ast.Store())], value=value)]),
+                ],
+                orelse=[],
+                finalbody=[]
             )
-            exprs.append(assign)
+            exprs.append(try_)
 
         # docstring values override keyword values
         if docstring:
@@ -390,6 +396,10 @@ class FunctionExploder(ast.NodeTransformer):
             for assign_expr in docstring_assigns:
                 tree = ast.parse(assign_expr)
                 exprs.append(tree.body[0])
+
+        # final dump of all arguments
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Arguments', cell_type='1'))
+        exprs.extend(ast.Expr(arg) for arg in func.args.args)
 
         # # input values from previous exception
         # exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
@@ -411,7 +421,7 @@ class FunctionExploder(ast.NodeTransformer):
         #     )
         #     exprs.append(assign)
 
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body of Function', cell_type='1'))
+        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body', cell_type='1'))
 
         return exprs + func.body
 

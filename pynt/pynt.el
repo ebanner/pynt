@@ -196,12 +196,8 @@ just return the buffer name.
 
 Throw an error if the buffer name has a period in it because that
 will mess with the namespace naming convention that pynt uses."
-  (let* ((script-name (file-name-nondirectory (buffer-file-name)))
-         (namespace-tokens (nbutlast (split-string script-name "\\.py") 1)))
-    (if (or (> (length namespace-tokens) 1)
-            (string-match-p (regexp-quote "=") (car namespace-tokens)))
-        (error "Buffer name cannot contain '.' nor '='.  Rename your buffer and try again!")
-      (car namespace-tokens))))
+  (let* ((script-name (file-name-nondirectory (buffer-file-name))))
+    (file-name-sans-extension script-name)))
 
 (defun pynt-get-worksheet-buffer-names (namespace)
   "Get the buffer names associated with the worksheets.

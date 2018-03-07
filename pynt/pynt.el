@@ -30,8 +30,8 @@
 (require 'magit)
 
 ;; Global
-(setq pynt-code-buffer-name nil
-      pynt-code-buffer-names nil)
+(setq pynt-code-buffer-file-name nil
+      pynt-code-buffer-file-names nil)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -229,6 +229,24 @@ themselves and then ask them for their names."
                   (candidates . ,(mapcar 'car namespaces))
                   (action . (lambda (namespace)
                               (pynt-switch-or-init namespace))))))))))
+
+(defun pynt-recover-notebook-window ()
+  "Recover the notebook window.
+
+Split the notebook window and switch to the notebook buffer in
+the new window.
+
+This function is called when the user switches code buffers and
+makes the notebook window disappear for some reason.
+
+Return a reference to the new window."
+  (interactive)
+  (let* ((notebook (gethash (pynt-module-name) pynt-namespace-to-notebook-map))
+         (notebook-buffer-name (ein:notebook-buffer notebook))
+         (new-window (split-window-right)))
+    (with-selected-window new-window
+      (switch-to-buffer notebook-buffer-name))
+    new-window))
 
 (defun pynt-notebook-window ()
   "Get the EIN notebook window.
@@ -449,7 +467,8 @@ In pynt development mode we set the print-* variables to values
 so that when we try and print EIN deeply nested and recursive
 data structures they print and do not lock up emacs."
   (interactive)
-  (setq print-level (if print-level nil 1)
+  (setq pynt-verbose (if pynt-verbose nil t)
+        print-level (if print-level nil 1)
         print-length (if print-length nil 1)
         print-circle (if print-circle nil t)))
 
@@ -751,6 +770,21 @@ Initialize it if it has not been initialized."
       (pynt-switch-to-namespace namespace)
     (pynt-init-namespace namespace)))
 
+(defun pynt-rebalance-frame ()
+  "Try to keep code buffer and notebook consistent.
+
+If you switch to another buffer and pynt mode is already running
+then swap out the notebook for the correct one.
+
+Meant to be added to the hook
+`window-configuration-change-hook'."
+  (when (and (boundp 'pynt-mode)
+             pynt-mode
+             (member (buffer-file-name) pynt-code-buffer-file-names)
+             (not (string= (buffer-file-name) pynt-code-buffer-file-name)))
+    (pynt-switch-to-namespace (pynt-module-name))
+    (setq pynt-code-buffer-file-name (buffer-file-name))))
+
 (defun pynt-init-namespace (namespace)
   "Initialize pynt for a namespace.
 
@@ -798,7 +832,7 @@ Argument NAMESPACE is a namespace in the code buffer."
   (delete-window (pynt-notebook-window))
 
   ;; Remove code buffer from global list.
-  (delete (pynt-module) pynt-code-buffer-names)
+  (delete (buffer-file-name) pynt-code-buffer-file-names)
 
   ;; Deactivate pynt scroll mode.
   (pynt-scroll-mode -1))
@@ -806,7 +840,7 @@ Argument NAMESPACE is a namespace in the code buffer."
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
-    (define-key map (kbd "C-c C-w") 'pynt-make-namespace-worksheets)
+    (define-key map (kbd "C-c C-w") 'pynt-recover-notebook-window)
     (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
     (define-key map (kbd "C-c C-k") 'pynt-select-jack-in-command)
     map))
@@ -820,8 +854,8 @@ Argument NAMESPACE is a namespace in the code buffer."
   (if pynt-mode
       (progn
         (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
-              pynt-code-buffer-name (buffer-name)
-              pynt-code-buffer-names (append pynt-code-buffer-names (list (buffer-name))))
+              pynt-code-buffer-file-name (buffer-file-name)
+              pynt-code-buffer-file-names (append pynt-code-buffer-file-names (list (buffer-file-name))))
         (when (and (not pynt-epc-server) (not pynt-ast-server))
           (pynt-start-epc-server)
           (pynt-start-ast-server))
@@ -847,35 +881,7 @@ Argument NAMESPACE is a namespace in the code buffer."
   (setq pynt-nth-cell-instance 0))
 
 (when pynt-start-jupyter-server-on-startup (pynt-jupyter-server-start))
-
-(defun pynt-maybe-switch-namespace ()
-  "Maybe switch the namespace.
-
-The idea with this function is that it runs every time you switch
-buffers. If you switch to another code buffer then you want to
-swap out the notebook to the corresponding one."
-  (let ((bname (buffer-name (car (buffer-list)))))
-    (when (and (boundp 'pynt-mode)
-               pynt-mode
-               (member bname pynt-code-buffer-names)
-               (not (string= bname pynt-code-buffer-name)))
-      (message "pynt-code-buffer-name was = %s" pynt-code-buffer-name)
-      (message "Now buffer-name = %s" bname)
-      (setq pynt-code-buffer-name bname))))
-
-(defun pynt-switch-notebook ()
-  "Keep code buffer and notebook consistent.
-
-If you switch to another buffer and pynt mode is already running
-then swap out the notebook for the correct one."
-  (when (and (boundp 'pynt-mode)
-             pynt-mode
-             (member (buffer-name) pynt-code-buffer-names)
-             (not (string= (buffer-name) pynt-code-buffer-name)))
-    (setq pynt-code-buffer-name (buffer-name))
-    (pynt-switch-or-init (pynt-module-name))))
-
-(add-hook 'window-configuration-change-hook 'pynt-switch-notebook)
+(add-hook 'window-configuration-change-hook 'pynt-rebalance-frame)
 
 (provide 'pynt)
 ;;; pynt.el ends here

@@ -289,42 +289,34 @@ class IPythonEmbedder(ast.NodeTransformer):
 
 
 class FunctionExploder(ast.NodeTransformer):
-    """Exposes the body of a function to the next scope up
+    """Takes a body of a function and pushes it into the global namespace"""
 
-    Transforms:
-
-        def foo(a, b, c):
-            '''Consise description
-
-            Longer description is included under the concise description
-
-            >>> a = 1
-            >>> b = 2
-            >>> c = 3
-
-            '''
-            z = a + b + c
-            return z
-
-    into something like
-
-        m: # Foo
-
-        m: Consise description
-
-        m: Longer description is included under the concise description
-
-        c: a = 1
-        c: b = 2
-        c: c = 3
-        c: z = a + b + c
-
-    TODO: Handle `return`s better.
-
-    """
     def __init__(self, buffer):
         super(__class__, self).__init__()
         self.buffer = buffer
+
+    def visit_Return(self, return_):
+        """Convert returns into assignment/exception pairs
+
+        Since the body of this function will be in the global namespace we
+        can't have any returns. An acceptable alternative is to set a variable
+        called 'RETURN' and then immediately raise an exception.
+
+        >>> self = FunctionExploder(buffer='foo')
+        >>> code = '''
+        ...
+        ... return 5
+        ...
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> return_, = tree.body
+
+        """
+        nodes = [
+            ast.Assign(targets=[ast.Name(id='RETURN', ctx=ast.Store())], value=return_.value),
+            ast.Raise(exc=ast.Call(func=ast.Name(id='Exception', ctx=ast.Load()), args=[ast.Str(s='return')], keywords=[]), cause=None),
+        ]
+        return nodes
 
     def visit_FunctionDef(self, func):
         """Roll out a function definition
@@ -342,14 +334,20 @@ class FunctionExploder(ast.NodeTransformer):
         ...     >>> b = 2
         ...
         ...     "\"\"
-        ...     c = a + b
-        ...     return c
+        ...     if True:
+        ...         return 1
+        ...     else:
+        ...         return 0
         ... y
         ... '''
         >>> tree = ast.parse(code)
         >>> func = tree.body[1]
 
         """
+        # tranform returns
+        func = self.generic_visit(func)
+
+        # extract doctests
         docstring = ast.get_docstring(func, clean=True)
         if docstring:
             func.body = func.body[1:]
@@ -357,9 +355,6 @@ class FunctionExploder(ast.NodeTransformer):
             results = parser.parse(docstring)
             docstring_prefix, docstring_examples = results[0].strip(), [result for result in results if isinstance(result, doctest.Example)]
             docstring_assigns = [example.source.strip() for example in docstring_examples]
-
-        # filter returns
-        func.body = [stmt for stmt in func.body if not isinstance(stmt, ast.Return)]
 
         # insert function name and docstring san doctests
         exprs = []

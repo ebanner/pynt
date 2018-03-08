@@ -696,7 +696,7 @@ for the default jack in commands identified by the identifier
 Available commands include those in the file pynt.json whose key
 is the variable `pynt-active-namespace'."
   (interactive)
-  (let* ((namespace-cmds (pynt-jack-in-commands)))
+  (let ((namespace-cmds (pynt-jack-in-commands)))
     (helm :sources
           `((name . "Select Jack-In Command")
             (candidates . ,namespace-cmds)

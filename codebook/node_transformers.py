@@ -396,7 +396,7 @@ class FunctionExploder(ast.NodeTransformer):
 
         # docstring values override keyword values
         if docstring:
-            exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
+            # exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
             for assign_expr in docstring_assigns:
                 tree = ast.parse(assign_expr)
                 exprs.append(tree.body[0])
@@ -623,7 +623,7 @@ class Annotator(ast.NodeTransformer):
         content = assign_content + targets_content.strip()
         target = astor.to_source(assign.targets[0]).strip()
         return [
-            Annotator.make_annotation(buffer=self.buffer, content=f'`{target} = ...`', cell_type='2'),
+            # Annotator.make_annotation(buffer=self.buffer, content=f'`{target} = ...`', cell_type='2'),
             assign,
             Annotator.make_annotation(buffer=self.buffer, content=content, lineno=assign.lineno if hasattr(assign, 'lineno') else None),
         ]
@@ -644,7 +644,7 @@ class Annotator(ast.NodeTransformer):
         if isinstance(expr.value, ast.Call) and getattr(expr.value.func, 'id', None) == '__cell__':
             return expr
         else:
-            return [expr, Annotator.make_annotation(expr, buffer=self.buffer)]
+            return [Annotator.make_annotation(expr, buffer=self.buffer), expr]
 
     def generic_visit(self, node):
         """Catch-all for nodes that slip through
@@ -657,80 +657,4 @@ class Annotator(ast.NodeTransformer):
         if isinstance(node, ast.Module):
             return super().generic_visit(node)
         else:
-            return [node, Annotator.make_annotation(node, buffer=self.buffer)]
-
-
-if __name__ == '__main__':
-    code = '''
-
-    def foo(a):
-        """This is a docstring
-
-        >>> a = 7
-
-        """
-        for i in range(a):
-            print(i)
-
-    '''
-    tree = ast.parse(code)
-    tree = FunctionExploder(buffer='bar').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-
-    tree = SyntaxRewriter(buffer='foo').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-
-    tree = Annotator(buffer='foo').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-
-    code = '''
-
-    if foo in bar:
-        width, height = scene_image.size
-        for i, obj in enumerate(mod_vec_payload['objects']):
-            print(1)
-            print(2)
-
-    # Cropping and processing the object patches from the scene image
-    object_arrays, object_imgs = [], []
-    for i, obj in tqdm(enumerate(mod_vec_payload['objects'])):
-        print(3)
-        print(4)
-
-    with graph.as_default():
-        eprint('GOT TF GRAPH AND VECTORIZING')
-        all_object_vectors = predictF2V(xception_ftr_xtrct, object_arrays)
-
-    '''
-    tree = ast.parse(code)
-    tree = FunctionExploder(buffer='bar').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-    tree = SyntaxRewriter(buffer='outside').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-    tree = Annotator(buffer='outside').visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-
-    code = '''
-
-    for i in range(2):
-        print(i)
-
-    '''
-    tree = ast.parse(code)
-    tree = FunctionExploder(buffer=bar).visit(tree)
-    code = astor.to_source(tree)
-    print(code)
-    tree = ast.parse(code)
-    tree.body = [SyntaxRewriter(buffer='outside').visit(node) for node in tree.body]
-    code = astor.to_source(tree)
-    print(code)
-    tree = ast.parse(code)
-    tree.body = [Annotator(buffer='outside').visit(node) for node in tree.body]
-    code = astor.to_source(tree)
-    print(code)
+            return [Annotator.make_annotation(node, buffer=self.buffer), node]

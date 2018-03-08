@@ -29,7 +29,7 @@
 (require 'ein-jupyter)
 (require 'magit)
 
-;; Global
+;; Global.
 (setq pynt-code-buffer-file-name nil
       pynt-code-buffer-file-names nil
       pynt-lock nil)
@@ -177,7 +177,7 @@ feature that was purely intended for making video demos prettier
 but does serve as a way to intuitively select a region of code.
 
 This map is used after a user changes the active namespace via
-the command `pynt-select-namespace'.")
+the command `pynt-choose-namespace'.")
 
 (defun pynt-notebook (&optional namespace)
   "Get the current notebook."
@@ -212,7 +212,7 @@ themselves and then ask them for their names."
          (worksheet-buffer-names (mapcar 'buffer-name worksheet-buffers)))
     worksheet-buffer-names))
 
-(defun pynt-select-namespace ()
+(defun pynt-choose-namespace ()
   "Switch the active code region by selecting from a list of namespaces."
   (interactive)
   (setq pynt-namespace-to-region-map (make-hash-table :test 'equal))
@@ -336,13 +336,15 @@ with namespace.
 Argument NAMESPACE is the namespace."
   (concat "ns=" (expand-file-name default-directory) namespace))
 
-(defun pynt-execute-current-namespace ()
+(defun pynt-dump-namespace ()
   "Dump the code in `pynt-active-namespace' into its EIN worksheet buffer.
 
 This is done by sending the code region out to the AST server
 where it is annotated with EPC calls and then the resulting code
 is sent to the IPython kernel to be executed."
   (interactive)
+  (when (not (slot-value ein:%connect% 'autoexec))
+    (ein:connect-toggle-autoexec))
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal))
   (widen)
   (pynt-kill-cells (pynt-namespace))
@@ -490,7 +492,7 @@ docstring will be the ones that get inserted."
                (namespace-buffer-name (format "ns=%s" namespace)))
           (message "The exception was hit in the namespace = %s" namespace-buffer-name)
           (pynt-switch-to-worksheet namespace-buffer-name)
-          (pynt-execute-current-namespace)))
+          (pynt-dump-namespace)))
       nil))
 
   (defun handle-python-exception (&rest args)
@@ -509,7 +511,7 @@ file in ~/Library/Jupyter/runtime/."
         (with-selected-window (pynt-notebook-window) (switch-to-buffer namespace-buffer-name)))
       (sit-for 5)
       (pynt-switch-kernel (pynt-get-latest-kernel-id))
-      (pynt-execute-current-namespace)
+      (pynt-dump-namespace)
       nil))
 
   (let ((connect-function
@@ -552,7 +554,7 @@ code buffer."
     (insert expr)
     (let ((cell (ein:get-cell-at-point))
           (ws (ein:worksheet--get-ws-or-error)))
-      (cond ((string= cell-type "code") (call-interactively 'ein:worksheet-execute-cell))
+      (cond ((string= cell-type "code") (ein:cell-set-autoexec cell t))
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
             (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (setq new-cell cell)))
@@ -691,7 +693,7 @@ for the default jack in commands identified by the identifier
          (namespace-cmds (or namespace-cmds (alist-get '* namespace-to-cmd-map))))
     (append namespace-cmds nil)))
 
-(defun pynt-select-jack-in-command ()
+(defun pynt-choose-jack-in-command ()
   "Select the jack-in command.
 
 Available commands include those in the file pynt.json whose key
@@ -810,7 +812,7 @@ Argument NAMESPACE is a namespace in the code buffer."
       (puthash namespace notebook pynt-namespace-to-notebook-map))
 
     ;; Connect the code buffer to this notebook.
-    (ein:connect-to-notebook-buffer new-notebook-buffer-name)
+    (pynt-connect-to-notebook-buffer new-notebook-buffer-name)
     (sit-for 2)
 
     ;; Initialize the EPC client.
@@ -844,10 +846,10 @@ Argument NAMESPACE is a namespace in the code buffer."
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-e") 'pynt-execute-current-namespace)
+    (define-key map (kbd "C-c C-e") 'pynt-dump-namespace)
     (define-key map (kbd "C-c C-w") 'pynt-recover-notebook-window)
-    (define-key map (kbd "C-c C-s") 'pynt-select-namespace)
-    (define-key map (kbd "C-c C-k") 'pynt-select-jack-in-command)
+    (define-key map (kbd "C-c C-s") 'pynt-choose-namespace)
+    (define-key map (kbd "C-c C-k") 'pynt-choose-jack-in-command)
     map))
 
 (define-minor-mode pynt-mode

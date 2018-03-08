@@ -76,8 +76,8 @@ def annotate(*code):
                 break
 
     exploded_tree = FunctionExploder(buffer=namespace).visit(tree)
-    rewritten_tree = SyntaxRewriter(buffer=namespace).visit(exploded_tree)
-    annotated_tree = Annotator(buffer=namespace).visit(rewritten_tree)
+    # rewritten_tree = SyntaxRewriter(buffer=namespace).visit(exploded_tree)
+    annotated_tree = Annotator(buffer=namespace).visit(exploded_tree)
     new_code = astor.to_source(annotated_tree)
 
     return new_code

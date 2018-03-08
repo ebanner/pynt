@@ -6,15 +6,24 @@ exist currently.
 """
 
 import ast
+import copy
 import doctest
 import random
 import string
 
 import astor
 
-
+N = []
 def __random_string__():
-    return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+    """Compute a random string
+
+    Also cache them in the global stack `N` so we can get them out later.
+
+    """
+    n = ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+    global N
+    N.append(n)
+    return n
 
 def upcase(s):
     """
@@ -420,6 +429,73 @@ class FunctionExploder(ast.NodeTransformer):
 
         return exprs + func.body
 
+class FirstPassFor(ast.NodeTransformer):
+    """Performs pure syntax rewrites
+
+    Currently the only syntax rewrite are for loops to while loops. Future
+    rewrites include context managers and decorators.
+
+    """
+    def __init__(self, buffer):
+        self.buffer = buffer
+
+    def visit_For(self, loop_):
+        """
+        >>> self = FirstPassFor(buffer='foo')
+        >>> code = '''
+        ...
+        ... for i in range(5):
+        ...     for j in range(5):
+        ...         k = i + j
+        ...         print(k)
+        ...
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> loop_, = tree.body
+
+        """
+        loop = self.generic_visit(loop_)
+        var = ast.Name(id=__random_string__(), ctx=ast.Store())
+        assign = ast.Assign(targets=[var], value=ast.Call(func=ast.Name(id='iter', ctx=ast.Load()), args=[loop.iter], keywords=[]))
+        first_pass = ast.Try(
+            body=[ast.Assign(targets=[loop.target], value=ast.Call(func=ast.Name(id='next', ctx=ast.Load()), args=[ast.Name(id=var, ctx=ast.Load())], keywords=[]))],
+            handlers=[ast.ExceptHandler(type=ast.Name(id='StopIteration', ctx=ast.Load()), name=None, body=[ast.Pass()])],
+            orelse=loop.body,
+            finalbody=[]
+        )
+        content = f'`for {astor.to_source(loop.target).strip()} in {astor.to_source(loop.iter).strip()} ...`'
+        return [
+            Annotator.make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno),
+            ast.Expr(loop.iter),
+            assign,
+            first_pass
+        ]
+
+class RestIterableFor(ast.NodeTransformer):
+    def __init__(self, buffer):
+        self.buffer = buffer
+
+    def visit_For(self, loop_):
+        """
+        >>> self = RestIterableFor()
+        >>> code = '''
+        ...
+        ... for i in range(5):
+        ...     for j in range(5):
+        ...         k = i + j
+        ...         print(k)
+        ... '''
+        >>> tree = ast.parse(code)
+        >>> loop_, = tree.body
+        >>> FirstPassFor().visit(copy.deepcopy(loop_))
+
+        """
+        loop = self.generic_visit(loop_)
+        global N
+        varname = N.pop(0)
+        loop.iter = ast.Name(id=varname, ctx=ast.Store())
+        return loop
+
 class SyntaxRewriter(ast.NodeTransformer):
     """Performs pure syntax rewrites
 
@@ -434,86 +510,22 @@ class SyntaxRewriter(ast.NodeTransformer):
     def visit_For(self, loop):
         """Rewrite for loops as while loops
 
-        for i in iterable:
-            <body>
-
-        becomes
-
-        p = iter(iterable)
-        while True:
-            try:
-                i = next(p)
-            except StopIteration:
-                break
-            <body>
-
         >>> self = SyntaxRewriter(buffer='foo')
         >>> code = '''
         ...
-        ... x
-        ... for i in range(2):
-        ...     for j in range(2):
+        ... for i in range(5):
+        ...     for j in range(5):
         ...         k = i + j
         ...         print(k)
-        ... y
         ...
         ... '''
         >>> tree = ast.parse(code)
-        >>> loop = tree.body[1]
+        >>> loop, = tree.body
 
         """
-        loop = self.generic_visit(loop)
-
-        # p = iter(iterable)
-        var = __random_string__()
-        assign_iter = ast.Assign(
-            targets=[ast.Name(id=var, ctx=ast.Store())],
-            value=ast.Call(
-                func=ast.Name(id='iter', ctx=ast.Load()),
-                args=[loop.iter],
-                keywords=[]
-            )
-        )
-
-        # i = next(iter(iterable))
-        assign_next = ast.Assign(
-            targets=[loop.target],
-            value=ast.Call(
-                func=ast.Name(id='next', ctx=ast.Load()),
-                args=[ast.Name(id=var, ctx=ast.Load())],
-                keywords=[]
-            )
-        )
-
-        # try:
-        #     p = iter(iterable)
-        # except:
-        #     break
-        try_node = ast.Try(
-            body=[assign_next],
-            handlers=[ast.ExceptHandler(type=ast.Name(id='StopIteration', ctx=ast.Load()), name=None, body=[ast.Break()])],
-            orelse=[],
-            finalbody=[]
-        )
-
-        # while True:
-        #     try:
-        #         p = iter(iterable)
-        #     except:
-        #        break
-        while_node = ast.While(
-            test=ast.NameConstant(value=True),
-            body=[try_node] + loop.body,
-            orelse=[]
-        )
-
-        content = f'`for {astor.to_source(loop.target).strip()} in {astor.to_source(loop.iter).strip()} ...`'
-        exprs = [
-            Annotator.make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno),
-            assign_iter,
-            while_node
-        ]
-        return exprs
+        first = FirstPassFor(self.buffer).visit(copy.deepcopy(loop))
+        rest = RestIterableFor(self.buffer).visit(copy.deepcopy(loop))
+        return first + [rest]
 
 class Annotator(ast.NodeTransformer):
     """Annotates code with commands to create jupyter notebook cells"""

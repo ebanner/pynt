@@ -31,7 +31,8 @@
 
 ;; Global
 (setq pynt-code-buffer-file-name nil
-      pynt-code-buffer-file-names nil)
+      pynt-code-buffer-file-names nil
+      pynt-lock nil)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -738,7 +739,14 @@ attaching the code buffer to it."
   (let ((notebook-buffer-name (pynt-namespace-to-buffer-name namespace)))
     (with-selected-window (pynt-notebook-window)
       (switch-to-buffer notebook-buffer-name))
-    (ein:connect-to-notebook-buffer notebook-buffer-name)))
+    (pynt-connect-to-notebook-buffer notebook-buffer-name)))
+
+(defun pynt-connect-to-notebook-buffer (notebook-buffer-name)
+  "Non-blocking call to `ein:connect-to-notebook-buffer'."
+  (deferred:$
+    (deferred:next
+      (lambda ()
+        (ein:connect-to-notebook-buffer notebook-buffer-name)))))
 
 (defun pynt-switch-or-init (namespace)
   "Switch to NAMESPACE.
@@ -748,7 +756,7 @@ Initialize it if it has not been initialized."
       (pynt-switch-to-namespace namespace)
     (pynt-init-namespace namespace)))
 
-(defun pynt-rebalance-frame ()
+(defun pynt-rebalance-on-buffer-change ()
   "Try to keep code buffer and notebook consistent.
 
 If you switch to another buffer and pynt mode is already running
@@ -758,10 +766,29 @@ Meant to be added to the hook
 `window-configuration-change-hook'."
   (when (and (boundp 'pynt-mode)
              pynt-mode
+             (not pynt-lock)
              (member (buffer-file-name) pynt-code-buffer-file-names)
              (not (string= (buffer-file-name) pynt-code-buffer-file-name)))
     (pynt-switch-to-namespace (pynt-module-name))
-    (setq pynt-code-buffer-file-name (buffer-file-name))))
+    (setq pynt-code-buffer-file-name (buffer-file-name))
+    (message "buffer-change: fname = %s" (buffer-file-name))))
+
+(defun pynt-rebalance-on-window-change ()
+  "Try to keep the code buffer and notebook consistent.
+
+This function is needed to handle the case where we change
+between windows in the same frame. Unfortunately
+`window-configuration-change-hook' does not fire in that case. So
+we hook into `buffer-list-update-hook' additionally."
+  (let ((fname (buffer-file-name (car (buffer-list)))))
+    (when (and (boundp 'pynt-mode)
+               pynt-mode
+               (not pynt-lock)
+               (member fname pynt-code-buffer-file-names)
+               (not (string= fname pynt-code-buffer-file-name)))
+      (pynt-switch-to-namespace (pynt-module-name))
+      (setq pynt-code-buffer-file-name fname)
+      (message "window-change: fname = %s" fname))))
 
 (defun pynt-init-namespace (namespace)
   "Initialize pynt for a namespace.
@@ -831,13 +858,16 @@ Argument NAMESPACE is a namespace in the code buffer."
   :lighter "pynt"
   (if pynt-mode
       (progn
-        (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
+        (setq pynt-lock t
+              pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
               pynt-code-buffer-file-name (buffer-file-name)
               pynt-code-buffer-file-names (append pynt-code-buffer-file-names (list (buffer-file-name))))
+        (message "pynt-code-buffer-file-name set by pynt-mode to %s" pynt-code-buffer-file-name)
         (when (and (not pynt-epc-server) (not pynt-ast-server))
           (pynt-start-epc-server)
           (pynt-start-ast-server))
-        (pynt-init-namespace (pynt-module-name)))
+        (pynt-init-namespace (pynt-module-name))
+        (setq pynt-lock nil))
     (pynt-mode-deactivate)))
 
 (defvar pynt-scroll-mode-map
@@ -859,7 +889,8 @@ Argument NAMESPACE is a namespace in the code buffer."
   (setq pynt-nth-cell-instance 0))
 
 (when pynt-start-jupyter-server-on-startup (pynt-jupyter-server-start))
-(add-hook 'window-configuration-change-hook 'pynt-rebalance-frame)
+(add-hook 'window-configuration-change-hook 'pynt-rebalance-on-buffer-change)
+(add-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change)
 
 (provide 'pynt)
 ;;; pynt.el ends here

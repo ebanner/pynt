@@ -32,7 +32,8 @@
 ;; Global.
 (setq pynt-code-buffer-file-name nil
       pynt-code-buffer-file-names nil
-      pynt-lock nil)
+      pynt-lock nil
+      pynt-code-buffer-name nil)
 
 (defgroup pynt nil
   "Customization group for pynt."
@@ -257,7 +258,9 @@ it's a different window now."
   (interactive)
   (multiple-value-bind (notebook-buffer-name)
       (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame))
-    (get-buffer-window notebook-buffer-name)))
+    (if notebook-buffer-name
+        (get-buffer-window notebook-buffer-name)
+      nil)))
 
 (defun pynt-log (&rest args)
   "Log the message when the variable `pynt-verbose' is t.
@@ -428,18 +431,21 @@ Make sure the new notebook is created in the same directory as
 the python file so that relative imports in the code work fine.
 
 The argument URL-OR-PORT is the url or port of the jupyter
-notebook server to connect to."
+notebook server to connect to.
+
+Set the pynt code buffer name because this function will jump the
+point to another window. In general buffer names are not to be
+relied on remember!"
   (interactive)
+  (setq pynt-code-buffer-name (buffer-name))
   (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-    (save-selected-window
-      (let* ((path (buffer-file-name))
-             (dir-path (substring (file-name-directory path) 0 -1))
-             (home-dir (concat (expand-file-name "~") "/"))
-             (nb-dir (replace-regexp-in-string home-dir "" dir-path))
-             (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
-        (with-current-buffer notebook-list-buffer-name
-          (ein:notebooklist-new-notebook url-or-port nil nb-dir)))
-      (sit-for 1))))
+    (let* ((path (buffer-file-name))
+           (dir-path (substring (file-name-directory path) 0 -1))
+           (home-dir (concat (expand-file-name "~") "/"))
+           (nb-dir (replace-regexp-in-string home-dir "" dir-path))
+           (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
+      (with-current-buffer notebook-list-buffer-name
+        (ein:notebooklist-new-notebook url-or-port nil nb-dir)))))
 
 (defun pynt-toggle-debug ()
   "Toggle pynt development mode.
@@ -615,11 +621,12 @@ deactivated."
 (defun pynt-attach-to-running-kernel (process event)
   "Attach to the most recently started kernel."
   (interactive)
-  (message "Process: %s had the event %s" process event)
-  (ein:notebook-restart-kernel (pynt-notebook))
-  (sit-for 5)
-  (pynt-init-epc-client)
-  (pynt-eval-buffer))
+  (with-current-buffer pynt-code-buffer-name
+    (message "Process: %s had the event %s" process event)
+    (ein:notebook-restart-kernel (pynt-notebook))
+    (sit-for 5)
+    (pynt-init-epc-client)
+    (pynt-eval-buffer)))
 
 (defun pynt-run-all-cells-above ()
   "Execute all cells above and including the cell at point."
@@ -744,11 +751,7 @@ attaching the code buffer to it."
     (pynt-connect-to-notebook-buffer notebook-buffer-name)))
 
 (defun pynt-connect-to-notebook-buffer (notebook-buffer-name)
-  "Non-blocking call to `ein:connect-to-notebook-buffer'."
-  (deferred:$
-    (deferred:next
-      (lambda ()
-        (ein:connect-to-notebook-buffer notebook-buffer-name)))))
+  (ein:connect-to-notebook-buffer notebook-buffer-name))
 
 (defun pynt-switch-or-init (namespace)
   "Switch to NAMESPACE.
@@ -799,32 +802,64 @@ Argument NAMESPACE is a namespace in the code buffer."
 
   (let ((new-notebook-buffer-name (pynt-namespace-to-buffer-name namespace)))
 
-    ;; Create a new notebook.
+    ;; Create a new notebook. The function `pynt-new-notebook' jumps the point
+    ;; to another window so we record the buffer name 
     (pynt-new-notebook)
+    (deferred:$
+      (deferred:next
+        (deferred:lambda ()
+          (if (seq-filter (lambda (buf-name) (string-prefix-p "*ein:" buf-name)) (pynt-get-buffer-names-in-frame))
+              (progn
+                (message "1: Notebook window is up!")
+                'pynt-notebook-window-is-up)
+            (message "Notebook window isn't up yet...")
+            (deferred:nextc (deferred:wait 500) self))))
 
-    ;; Save a reference to the new notebook.
-    (multiple-value-bind (notebook-buffer-name)
-        (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame))
-      (setq notebook nil)
-      (with-current-buffer notebook-buffer-name
-        (rename-buffer new-notebook-buffer-name)
-        (setq notebook ein:%notebook%))
-      (puthash namespace notebook pynt-namespace-to-notebook-map))
+      ;; Tell code buffer about the notebook.
+      (deferred:nextc it
+        (lambda (arg)
+          (setq notebook nil)
+          (with-current-buffer (window-buffer (pynt-notebook-window))
+            (rename-buffer new-notebook-buffer-name)
+            (setq notebook ein:%notebook%))
+          (with-current-buffer pynt-code-buffer-name
+            (puthash namespace notebook pynt-namespace-to-notebook-map)
+            (pynt-connect-to-notebook-buffer new-notebook-buffer-name))
+          (message "2: Told code buffer about notebook!")))
 
-    ;; Connect the code buffer to this notebook.
-    (pynt-connect-to-notebook-buffer new-notebook-buffer-name)
-    (sit-for 2)
+      ;; Connect code buffer to notebook.
+      (deferred:nextc it
+        (deferred:lambda (arg)
+          (with-current-buffer pynt-code-buffer-name
+            (if ein:connect-mode
+                (progn
+                  (message "3: Code buffer connected to notebook!")
+                  'pynt-connected)
+              (message "Code buffer not yet connected...")
+              (deferred:nextc (deferred:wait 500) self)))))
 
-    ;; Initialize the EPC client.
-    (pynt-init-epc-client)
+      ;; Wait until kernel is live.
+      (deferred:nextc it
+        (deferred:lambda (arg)
+          (if (ein:kernel-live-p (ein:get-kernel))
+              (progn
+                (message "4: Kernel is live!")
+                'kernel-is-live)
+            (message "Kernel not ready...")
+            (deferred:nextc (deferred:wait 500) self))))
 
-    ;; Jack in to that namespace.
-    (let ((command (car (pynt-jack-in-commands namespace))))
-      (when command
-        (if (not (string= command "ein:connect-run-or-eval-buffer"))
-            (pynt-jack-in command namespace)
-          (ein:shared-output-eval-string (format "__name__ = '%s'" (pynt-module-name)))
-          (pynt-eval-buffer))))))
+      ;; Jack into the namespace.
+      (deferred:nextc it
+        (lambda (arg)
+          (with-current-buffer pynt-code-buffer-name
+            (pynt-init-epc-client)
+            (let ((command (car (pynt-jack-in-commands namespace))))
+              (when command
+                (if (not (string= command "ein:connect-run-or-eval-buffer"))
+                    (progn
+                      (pynt-jack-in command namespace))
+                  (ein:shared-output-eval-string (format "__name__ = '%s'" (pynt-module-name)))
+                  (pynt-eval-buffer))))))))))
 
 (defun pynt-mode-deactivate ()
   "Deactivate pynt mode."

@@ -301,6 +301,9 @@ Do nothing if the worksheet does not exist."
         (while t (call-interactively 'ein:worksheet-kill-cell))
       ('error))))
 
+(defun pynt-notebook-buffer-window ()
+  (get-buffer-window (ein:notebook-buffer (pynt-notebook))))
+
 (defun pynt-get-buffer-names-in-frame ()
   "Get the buffer names in the active frame.
 
@@ -358,8 +361,8 @@ is sent to the IPython kernel to be executed."
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (message "Dumping the namespace!")
-      (pynt-log "Calling python AST server with active namespace = %s ..." (pynt-query-namespace))
-      (epc:call-deferred pynt-ast-server 'annotate `(,code ,(pynt-query-namespace)))
+      (pynt-log "Calling python AST server with active namespace = %s ..." pynt-namespace)
+      (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace))
       (deferred:nextc it
         (lambda (annotated-code)
           (pynt-log "Annotated code = %S" annotated-code)
@@ -389,8 +392,8 @@ don't want to worry about at this time."
               (let* ((cell (nth pynt-nth-cell-instance cells))
                      (cell-marker (ein:cell-location cell :input))
                      (point-line (count-screen-lines (window-start) (point)))
-                     (window (get-buffer-window (pynt-query-notebook-buffer-name))))
-                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) (pynt-query-notebook-buffer-name)))
+                     (window (pynt-notebook-buffer-window)))
+                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) window))
                   (select-window window)
                   (widen)
                   (goto-char cell-marker)
@@ -743,7 +746,7 @@ pynt-embed finishes."
                 (message "Kernel killed!")
                 'kernel-killed)
             (message "Kernel not killed yet. Polling...")
-            (deferred:nextc (deferred:wait 100) self)))))
+            (deferred:nextc (deferred:wait 10) self)))))
 
     ;; Initialize the EPC client and dump the namespace.
     (deferred:nextc it
@@ -901,25 +904,33 @@ won't run until this finishes."
 (defun pynt-switch-or-init (namespace)
   "Switch to NAMESPACE.
 
-Initialize it if it has not been initialized."
+Initialize it if it has not been initialized.
+
+This function is necessary because of the way we can create
+notebooks. When we run the command `pynt-switch-namespace' if the
+selected namespace has not been created then we create it. It's
+like launching pynt mode for the very first time. Otherwise if it
+exists we just switch to it."
   (if (gethash namespace pynt-namespace-to-notebook-map)
       (pynt-switch-to-namespace namespace)
-    (pynt-init-namespace namespace)))
+    (pynt-init namespace)))
 
 (defun pynt-init (namespace)
-  "Initialize a code namespace.
+  "Initialize a namespace.
 
-This mainly involves"
+This involves creating a notebook if we haven't created one yet."
 
   ;; Globals.
   (setq pynt-lock t               ; no hooks should run until init finishes
-        pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
         pynt-code-buffer-file-name (buffer-file-name))
   (add-to-list 'pynt-code-buffer-file-names (buffer-file-name))
 
   ;; Locals.
   (setq pynt-namespace namespace
-        pynt-code-buffer-name (buffer-name)))
+        pynt-code-buffer-name (buffer-name))
+
+  ;; Create new notebook.
+  (pynt-new-notebook))
 
 (defun pynt-rebalance-on-buffer-change ()
   "Try to keep code buffer and notebook consistent.
@@ -993,11 +1004,11 @@ we hook into `buffer-list-update-hook' additionally."
         (pynt-start-epc-server)
         (pynt-start-ast-server)
 
-        ;; Set variables.
-        (pynt-init (pynt-module-name))
+        ;; Make a map containing the notebooks once and only once.
+        (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal))
 
-        ;; Create a new notebook.
-        (pynt-new-notebook))
+        ;; Set variables.
+        (pynt-init (pynt-module-name)))
     (pynt-mode-deactivate)))
 
 (defvar pynt-scroll-mode-map

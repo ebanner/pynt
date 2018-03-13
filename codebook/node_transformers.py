@@ -322,7 +322,7 @@ class FunctionExploder(ast.NodeTransformer):
 
         """
         nodes = [
-            ast.Assign(targets=[ast.Name(id='RETURN', ctx=ast.Store())], value=return_.value),
+            ast.Assign(targets=[ast.Name(id='RETURN', ctx=ast.Store())], value=return_.value, lineno=return_.lineno),
             ast.Raise(exc=ast.Call(func=ast.Name(id='Exception', ctx=ast.Load()), args=[ast.Str(s='return')], keywords=[]), cause=None),
         ]
         return nodes

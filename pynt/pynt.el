@@ -191,13 +191,13 @@ the command `pynt-choose-namespace'.")
   "Get the current notebook."
   (gethash (or namespace pynt-namespace) pynt-namespace-to-notebook-map))
 
-(defun pynt-notebook-buffer (namespace)
+(defun pynt-notebook-buffer (&optional namespace)
   "Get the buffer of the notebook."
   (ein:notebook-buffer (pynt-notebook (or namespace pynt-namespace))))
 
-(defun pynt-notebook-buffer-name ()
+(defun pynt-notebook-buffer-name (&optional namespace)
   "Get the buffer name of the EIN notebook."
-  (let ((notebook-buffer (ein:notebook-buffer (pynt-notebook))))
+  (let ((notebook-buffer (ein:notebook-buffer (pynt-notebook (or namespace pynt-namespace)))))
     (buffer-name notebook-buffer)))
 
 (defun pynt-module-name ()
@@ -233,20 +233,11 @@ will mess with the namespace naming convention that pynt uses."
 (defun pynt-recover-notebook-window ()
   "Recover the notebook window.
 
-Split the notebook window and switch to the notebook buffer in
-the new window.
-
-This function is called when the user switches code buffers and
-makes the notebook window disappear for some reason.
-
-Return a reference to the new window."
+You can call this function in case the automatic window
+arrangement fails. But it's been working pretty well lately so
+you shouldn't have to use it."
   (interactive)
-  (let* ((notebook (gethash (pynt-module-name) pynt-namespace-to-notebook-map))
-         (notebook-buffer-name (ein:notebook-buffer notebook))
-         (new-window (split-window-right)))
-    (with-selected-window new-window
-      (switch-to-buffer notebook-buffer-name))
-    new-window))
+  (pynt-pop-up-notebook-buffer (pynt-notebook-buffer)))
 
 (defun pynt-notebook-window ()
   "Get the notebook window."

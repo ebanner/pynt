@@ -466,9 +466,7 @@ code into the notebook."
         (with-current-buffer pynt-code-buffer-name
           (let ((command (car (pynt-jack-in-commands pynt-namespace))))
             (when command
-              (if (string= command "ein:connect-run-or-eval-buffer")
-                  (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)
-                (pynt-jack-in command)))))))))
+              (pynt-jack-in command))))))))
 
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side.
@@ -711,7 +709,7 @@ pynt-embed to jack into the desired namespace."
   (with-current-buffer pynt-code-buffer-name
     (pynt-log "Jacking into namespace = %s with command = %s..." pynt-namespace command)
     (if (string= command "ein:connect-run-or-eval-buffer")
-        (pynt-dump-namespace)
+        (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)
 
       ;; pynt-embed will temporarily modify the underlying file. To prevent emacs
       ;; from rendering the change in buffer change the underlying file until

@@ -77,11 +77,6 @@ The jupyter server listens on the port defined by the variable
 (defcustom pynt-verbose nil
   "Log pynt debug information if t and do not otherwise.")
 
-(defcustom pynt-project-root nil
-  "Project root to call pynt jack in commands from.
-
-You must put a trailing slash on the end for it to work right!")
-
 (defvar pynt-init-code-template
   "
 
@@ -464,9 +459,15 @@ code into the notebook."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
-          (let ((command (car (pynt-jack-in-commands pynt-namespace))))
+          (let ((command (car (pynt-jack-in-commands))))
             (when command
               (pynt-jack-in command))))))))
+
+(defun pynt-command-map ()
+  "Get the command map.
+
+Read the pynt.json file in the project root."
+  (json-read-file (concat (pynt-project-root) "pynt.json")))
 
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side.
@@ -683,16 +684,22 @@ pynt (and EIN)."
         (setq cell (ein:get-cell-at-point)))
       (call-interactively 'ein:worksheet-execute-cell))))
 
-(defun pynt-get-project-root ()
+(defun pynt-project-root ()
   "Get the project root.
 
 Use the variable `pynt-project-root' first. If that is not set
 then ask magit for the closest enclosing github repo root."
-  (or pynt-project-root (magit-toplevel)))
+  (magit-toplevel))
 
-(defun pynt-relative-curdir-path ()
-  "Relative path of the current directory from the project root."
-  (let* ((project-path (expand-file-name (pynt-get-project-root)))
+(defun pynt-project-relative-path ()
+  "Relative path from the project root."
+  (let* ((project-path (expand-file-name (pynt-project-root)))
+         (project-relative-path (replace-regexp-in-string project-path "" (buffer-file-name))))
+    project-relative-path))
+
+(defun pynt-project-relative-dir ()
+  "Relative directory the project root."
+  (let* ((project-path (expand-file-name (pynt-project-root)))
          (absolute-dir-path (file-name-directory (buffer-file-name)))
          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
     relative-dir-path))
@@ -717,8 +724,8 @@ pynt-embed to jack into the desired namespace."
       (set-visited-file-name "*pynt code*")
 
       (set-process-sentinel
-       (let* ((default-directory (pynt-get-project-root))
-              (namespace-path (concat (pynt-relative-curdir-path) pynt-namespace)))
+       (let* ((default-directory (pynt-project-root))
+              (namespace-path (concat (pynt-project-relative-dir) pynt-namespace)))
          (pynt-log "Calling pynt-embed -namespace %s -cmd %s..." namespace-path command)
          (start-process "PYNT Kernel"
                         "*pynt-kernel*"
@@ -726,6 +733,28 @@ pynt-embed to jack into the desired namespace."
                         "-namespace" namespace-path
                         "-cmd" command))
        'pynt-switch-kernel))))
+
+(defun pynt-matching-jack-in-patterns ()
+  "Get the patterns which match this file in pynt.json.
+
+FIXME this can probably be sped up substantially."
+  (defun directory-length (path) (length (split-string path "/")))
+  (let* ((symbol-patterns (mapcar 'car (pynt-command-map)))
+         (patterns (mapcar 'symbol-name symbol-patterns))
+         (patterns (seq-filter (lambda (pattern) (not (string= "**" pattern))) patterns))
+         (sorted-patterns
+          (reverse
+           (sort patterns
+                 (lambda (left right)
+                   (< (directory-length left) (directory-length right))))))
+         (path (pynt-project-relative-path))
+         (default-directory (pynt-project-root))
+         (globs (mapcar 'file-expand-wildcards sorted-patterns))
+         (preds (mapcar (lambda (glob) (member path glob)) globs))
+         (zip (mapcar* 'cons preds sorted-patterns))
+         (survivors (seq-filter (lambda (pair) (cdr pair)) zip))
+         (commands (mapcar 'cdr survivors)))
+    (add-to-list 'commands "**" :append)))
 
 (defun pynt-jack-in-commands (&optional namespace)
   "Return the commands for NAMESPACE.
@@ -740,13 +769,10 @@ If there are no jack in commands for NAMESPACE then look for look
 for the default jack in commands identified by the identifier
 \"*\"."
   (with-current-buffer pynt-code-buffer-name
-    (let* ((namespace-to-cmd-map (json-read-file (concat (pynt-get-project-root) "pynt.json")))
-           (namespace (or namespace pynt-namespace))
-           (namespace (concat (pynt-relative-curdir-path) namespace))
-           (namespace (intern namespace))
-           (namespace-cmds (alist-get namespace namespace-to-cmd-map))
-           (namespace-cmds (or namespace-cmds (alist-get '* namespace-to-cmd-map))))
-      (append namespace-cmds nil))))
+    (let* ((command-map (pynt-command-map))
+           (command-vectors (append (mapcar (lambda (command) (alist-get (intern command) command-map)) (pynt-matching-jack-in-patterns))))
+           (command-lists (append (mapcar (lambda (vector) (append vector nil)) command-vectors))))
+      (apply 'append command-lists))))
 
 (defun pynt-choose-jack-in-command ()
   "Select the jack-in command.

@@ -74,7 +74,7 @@ mode can run in multiple buffers.")
 The jupyter server listens on the port defined by the variable
 `ein:url-or-port'.")
 
-(defcustom pynt-verbose t
+(defcustom pynt-verbose nil
   "Log pynt debug information if t and do not otherwise.")
 
 (defcustom pynt-project-root nil
@@ -187,24 +187,13 @@ but does serve as a way to intuitively select a region of code.
 This map is used after a user changes the active namespace via
 the command `pynt-choose-namespace'.")
 
-(defun pynt-make-notebook-path ()
-  "Make a notebook name from NAMESPACE.
-
-The format of the notebook name is
-$HOME/path/to/curdir/NAMESPACE. This is so it can correspond to
-an actual jupyter notebook file that will be saved on disk."
-  (let* ((relative-path (replace-regexp-in-string (expand-file-name "~/") "" (buffer-file-name)))
-         (relative-dir (file-name-directory relative-path))
-         (notebook-name (concat relative-dir pynt-namespace ".ipynb")))
-    notebook-name))
-
 (defun pynt-notebook (&optional namespace)
   "Get the current notebook."
   (gethash (or namespace pynt-namespace) pynt-namespace-to-notebook-map))
 
-(defun pynt-notebook-buffer ()
+(defun pynt-notebook-buffer (namespace)
   "Get the buffer of the notebook."
-  (ein:notebook-buffer (pynt-notebook)))
+  (ein:notebook-buffer (pynt-notebook (or namespace pynt-namespace))))
 
 (defun pynt-notebook-buffer-name ()
   "Get the buffer name of the EIN notebook."
@@ -222,18 +211,6 @@ Throw an error if the buffer name has a period in it because that
 will mess with the namespace naming convention that pynt uses."
   (let* ((script-name (file-name-nondirectory (buffer-file-name))))
     (file-name-sans-extension script-name)))
-
-(defun pynt-get-worksheet-buffer-names (namespace)
-  "Get the buffer names associated with the worksheets.
-
-Note we cannot simply use the function
-`ein:worksheet--buffer-name' since we rename the buffers and the
-reference appears to get stale. Hence a layer of indirection is
-required where we need to get references to the buffers
-themselves and then ask them for their names."
-  (let* ((worksheet-buffers (mapcar 'ein:worksheet--get-buffer (ein:$notebook-worksheets (pynt-notebook namespace))))
-         (worksheet-buffer-names (mapcar 'buffer-name worksheet-buffers)))
-    worksheet-buffer-names))
 
 (defun pynt-choose-namespace ()
   "Switch the active code region by selecting from a list of namespaces."
@@ -448,7 +425,10 @@ modified version of the function `pop-to-buffer'."
   "Rename the notebook to the current namespace."
 
   (message "Setting notebook name variable...")
-  (setq pynt-notebook-path (pynt-make-notebook-path))
+  (let* ((relative-path (replace-regexp-in-string (expand-file-name "~/") "" (buffer-file-name)))
+         (relative-dir (file-name-directory relative-path))
+         (notebook-name (concat relative-dir pynt-namespace ".ipynb")))
+    (setq pynt-notebook-path))
 
   (delete-file (file-name-nondirectory pynt-notebook-path))
 
@@ -977,20 +957,21 @@ we hook into `buffer-list-update-hook' additionally."
 (defun pynt-mode-deactivate ()
   "Deactivate pynt mode."
 
-  ;; Remove advice.
+  ;; Remove hooks.
   (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+  (remove-hook 'window-configuration-change-hook 'pynt-rebalance-on-buffer-change :local)
+  (remove-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change :local)
+  (remove-hook 'after-change-functions 'pynt-invalidate-scroll-map :local)
+  (remove-hook 'post-command-hook #'pynt-scroll-cell-window :local)
 
-  ;; Remove notebook worksheets and pynt window.
-  (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
-    (dolist (worksheet-buffer-name (pynt-get-worksheet-buffer-names namespace))
-      (pynt-delete-worksheet worksheet-buffer-name)))
+  ;; Remove notebooks.
   (delete-window (pynt-notebook-window))
+  (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
+    (with-current-buffer (pynt-notebook-buffer namespace)
+      (call-interactively 'ein:notebook-kill-kernel-then-close-command)))
 
   ;; Remove code buffer from global list.
-  (delete (buffer-file-name) pynt-code-buffer-file-names)
-
-  ;; Deactivate pynt scroll mode.
-  (pynt-scroll-mode -1))
+  (delete (buffer-file-name) pynt-code-buffer-file-names))
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))

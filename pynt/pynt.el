@@ -50,6 +50,10 @@ Using the value of a remote machine should be possible but is
 currently untested."
   :options '("localhost" "docker.for.mac.localhost"))
 
+(defcustom pynt-scroll t
+  "Scroll the notebook buffer with the code buffer. "
+  :options '(nil t))
+
 (defcustom pynt-scroll-narrow-view nil
   "Narrow the notebook buffer if t and don't otherwise.
 
@@ -356,6 +360,10 @@ is sent to the IPython kernel to be executed."
           (ein:connect-eval-buffer)
           (ein:shared-output-eval-string annotated-code))))))
 
+(defun pynt-toggle-scroll ()
+  (interactive)
+  (setq pynt-scroll (not pynt-scroll)))
+
 (defun pynt-scroll-cell-window ()
   "Scroll the EIN worksheet buffer with the code buffer.
 
@@ -371,30 +379,31 @@ case that the cell that did correspond to a line has since been
 deleted. Basically there is a bunch of data invalidation that I
 don't want to worry about at this time."
   (interactive)
-  (save-selected-window
-    (let ((entries (gethash (line-number-at-pos) pynt-line-to-cell-map)))
-      (when entries
-        (condition-case exception
-            (multiple-value-bind (namespace cell) (nth pynt-nth-cell-instance entries)
-              (if (string= namespace pynt-namespace)
-                  (let* ((cell-marker (ein:cell-location cell :input))
-                         (point-line (count-screen-lines (window-start) (point))))
-                    (when cell-marker
-                      (select-window (pynt-notebook-window))
-                      (widen)
-                      (goto-char cell-marker)
-                      (recenter point-line)
-                      (when pynt-scroll-narrow-view
-                        (beginning-of-line)
-                        (previous-line)
-                        (call-interactively 'set-mark-command)
-                        (call-interactively 'ein:worksheet-goto-next-input)
-                        (call-interactively 'ein:worksheet-goto-next-input)
-                        (previous-line)
-                        (call-interactively 'narrow-to-region)
-                        (beginning-of-buffer))))
-                (pynt-switch-to-namespace namespace)))
-          ('error))))))
+  (when pynt-scroll
+    (save-selected-window
+      (let ((entries (gethash (line-number-at-pos) pynt-line-to-cell-map)))
+        (when entries
+          (condition-case exception
+              (multiple-value-bind (namespace cell) (nth pynt-nth-cell-instance entries)
+                (if (string= namespace pynt-namespace)
+                    (let* ((cell-marker (ein:cell-location cell :input))
+                           (point-line (count-screen-lines (window-start) (point))))
+                      (when cell-marker
+                        (select-window (pynt-notebook-window))
+                        (widen)
+                        (goto-char cell-marker)
+                        (recenter point-line)
+                        (when pynt-scroll-narrow-view
+                          (beginning-of-line)
+                          (previous-line)
+                          (call-interactively 'set-mark-command)
+                          (call-interactively 'ein:worksheet-goto-next-input)
+                          (call-interactively 'ein:worksheet-goto-next-input)
+                          (previous-line)
+                          (call-interactively 'narrow-to-region)
+                          (beginning-of-buffer))))
+                  (pynt-switch-to-namespace namespace)))
+            ('error)))))))
 
 (defun pynt-prev-cell-instance ()
   "Scroll the EIN worksheet to the next occurrence of the current code line.
@@ -532,10 +541,10 @@ In pynt development mode we set the print-* variables to values
 so that when we try and print EIN deeply nested and recursive
 data structures they print and do not lock up emacs."
   (interactive)
-  (setq pynt-verbose (if pynt-verbose nil t)
+  (setq pynt-verbose (not pynt-verbose)
         print-level (if print-level nil 1)
         print-length (if print-length nil 1)
-        print-circle (if print-circle nil t))
+        print-circle (not print-circle))
   (if ein:debug
       (ein:dev-stop-debug)
     (ein:dev-start-debug)))

@@ -300,7 +300,7 @@ is sent to the IPython kernel to be executed."
   (pynt-kill-cells pynt-namespace)
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (message "Dumping the namespace!")
+      (pynt-log "Dumping the namespace!")
       (pynt-log "Calling python AST server with active namespace = %s ..." pynt-namespace)
       (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace))
       (deferred:nextc it
@@ -392,7 +392,7 @@ modified version of the function `pop-to-buffer'."
 TODO this is currently not used but would be nice to get
 working."
 
-  (message "Setting notebook name variable...")
+  (pynt-log "Setting notebook name variable...")
   (let* ((relative-path (replace-regexp-in-string (expand-file-name "~/") "" (buffer-file-name)))
          (relative-dir (file-name-directory relative-path))
          (notebook-name (concat relative-dir pynt-namespace ".ipynb")))
@@ -405,9 +405,9 @@ working."
     (deferred:lambda (msg)
       (if (not (file-exists-p (file-name-nondirectory pynt-notebook-path)))
           (progn
-            (message "%s is deleted! Renaming notebook to %s..." (file-name-nondirectory pynt-notebook-path) pynt-notebook-path)
+            (pynt-log "%s is deleted! Renaming notebook to %s..." (file-name-nondirectory pynt-notebook-path) pynt-notebook-path)
             'notebook-is-deleted)
-        (message "%s still exists..." (file-name-nondirectory pynt-notebook-path))
+        (pynt-log "%s still exists..." (file-name-nondirectory pynt-notebook-path))
         (deferred:nextc (deferred:wait 500) self))))
 
   ;; Rename the notebook.
@@ -424,9 +424,9 @@ working."
       (with-current-buffer pynt-code-buffer-name
         (if (string= (ein:$notebook-notebook-path (pynt-notebook)) pynt-notebook-path)
             (progn
-              (message "[2] : Notebook name is set!")
+              (pynt-log "[2] : Notebook name is set!")
               'pynt-connected)
-          (message "Still waiting for notebook name to change...")
+          (pynt-log "Still waiting for notebook name to change...")
           (deferred:nextc (deferred:wait 500) self))))))
 
 (defun pynt-setup-notebook (&rest -ignore-)
@@ -441,18 +441,23 @@ code into the notebook."
 
   (setq notebook ein:%notebook%)
   (with-current-buffer pynt-code-buffer-name
-    (message "Putting %s into hash..." pynt-namespace)
-    (puthash pynt-namespace notebook pynt-namespace-to-notebook-map)
-    (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name)))
+    (pynt-log "Putting %s into hash..." pynt-namespace)
+    (puthash pynt-namespace notebook pynt-namespace-to-notebook-map))
 
   (deferred:$
-    ;; Poll until code buffer is connected.
+    ;; Connect code buffer to notebook.
     (deferred:next
+      (lambda ()
+        (with-current-buffer pynt-code-buffer-name
+          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name)))))
+
+    ;; Poll until code buffer is connected.
+    (deferred:nextc it
       (deferred:lambda (msg)
         (with-current-buffer pynt-code-buffer-name
           (if ein:connect-mode
-              (message "Code buffer connected!")
-            (message "Code buffer not connected...")
+              (pynt-log "Code buffer connected!")
+            (pynt-log "Code buffer not connected...")
             (deferred:nextc (deferred:wait 500) self)))))
 
     ;; Dump the module-level namespace. Possibly jack in first.
@@ -504,7 +509,7 @@ docstring will be the ones that get inserted."
         (when (not (string= namespace-where "<module>")) ; only jump when exception originated in some other function
           (let* ((namespace (concat (pynt-module-name) "." namespace-where))
                  (namespace-buffer-name (format "ns=%s" namespace)))
-            (message "The exception was hit in the namespace = %s" namespace-buffer-name)
+            (pynt-log "The exception was hit in the namespace = %s" namespace-buffer-name)
             (pynt-switch-to-worksheet namespace-buffer-name)
             (pynt-dump-namespace)))
         nil))
@@ -521,7 +526,7 @@ Sit for 5 seconds while the python process generates a kernel
 file in ~/Library/Jupyter/runtime/."
       (multiple-value-bind (namespace-where) args
         (let ((namespace-buffer-name (format "ns=%s" namespace-where)))
-          (message "The exception was hit in the namespace = %s" namespace-buffer-name)
+          (pynt-log "The exception was hit in the namespace = %s" namespace-buffer-name)
           (with-selected-window (pynt-notebook-window) (switch-to-buffer namespace-buffer-name)))
         (sit-for 5)
         (pynt-switch-kernel (pynt-get-latest-kernel-id))
@@ -600,16 +605,16 @@ Argument CALLBACK is a function to call afterwards."
         (with-current-buffer pynt-code-buffer-name
           (if (ein:kernel-live-p (pynt-notebook-kernel))
               (progn
-                (message "Kernel is live!")
+                (pynt-log "Kernel is live!")
                 'kernel-is-live)
-            (message "Kernel not live...")
+            (pynt-log "Kernel not live...")
             (deferred:nextc (deferred:wait 500) self)))))
 
     ;; Evaluate init code.
     (deferred:nextc it
       (lambda (msg)
         (let ((pynt-init-code (format pynt-init-code-template pynt-epc-server-hostname pynt-epc-port additional-code)))
-          (message "Evaluating initial code!")
+          (pynt-log "Evaluating initial code!")
           (ein:shared-output-eval-string pynt-init-code))
         nil))
 
@@ -638,7 +643,7 @@ recently started kernel.
 This function is meant to be used as a sentinel after the process
 pynt-embed finishes."
   (select-window (get-buffer-window "*pynt code*"))
-  (message "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
+  (pynt-log "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
   (set-visited-file-name pynt-code-buffer-file-name)
 
   (deferred:$
@@ -654,9 +659,9 @@ pynt-embed finishes."
         (with-current-buffer pynt-code-buffer-name
           (if (not (ein:kernel-live-p (pynt-notebook-kernel)))
               (progn
-                (message "Kernel killed!")
+                (pynt-log "Kernel killed!")
                 'kernel-killed)
-            (message "Kernel not killed yet. Polling...")
+            (pynt-log "Kernel not killed yet. Polling...")
             (deferred:nextc (deferred:wait 10) self)))))
 
     ;; Initialize the EPC client and dump the namespace.
@@ -704,7 +709,7 @@ pynt-embed to jack into the desired namespace."
   (interactive)
   (when namespace (setq pynt-namespace namespace))
   (with-current-buffer pynt-code-buffer-name
-    (message "Jacking into namespace = %s with command = %s..." pynt-namespace command)
+    (pynt-log "Jacking into namespace = %s with command = %s..." pynt-namespace command)
     (if (string= command "ein:connect-run-or-eval-buffer")
         (pynt-dump-namespace)
 
@@ -716,7 +721,7 @@ pynt-embed to jack into the desired namespace."
       (set-process-sentinel
        (let* ((default-directory (pynt-get-project-root))
               (namespace-path (concat (pynt-relative-curdir-path) pynt-namespace)))
-         (message "Calling pynt-embed -namespace %s -cmd %s..." namespace-path command)
+         (pynt-log "Calling pynt-embed -namespace %s -cmd %s..." namespace-path command)
          (start-process "PYNT Kernel"
                         "*pynt-kernel*"
                         "pynt-embed"
@@ -782,6 +787,7 @@ which will run the `pynt-rebalance-on-window-change' hook which
 will run this function again and we will get into an infinite
 loop. Hence we set this lock so that the buffer and window hooks
 won't run until this finishes."
+  (pynt-log "Switching to namespace = %s..." namespace)
   (setq pynt-namespace namespace
         pynt-lock t)
   (pynt-pop-up-notebook-buffer (pynt-notebook-buffer))
@@ -789,8 +795,9 @@ won't run until this finishes."
   (deferred:$
     (deferred:next
       (lambda ()
-        (message "Connecting to code buffer to notebook...")
-        (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name))))))
+        (with-current-buffer pynt-code-buffer-name
+          (pynt-log "Connecting to code buffer to notebook...")
+          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name)))))))
 
 (defun pynt-connect-to-notebook-buffer (notebook-buffer-name)
   (ein:connect-to-notebook-buffer notebook-buffer-name)
@@ -812,7 +819,7 @@ exists we just switch to it."
     (pynt-init namespace)))
 
 (defun pynt-invalidate-scroll-map (&optional a b c)
-  (message "Invalidating scroll map!")
+  (pynt-log "Invalidating scroll map!")
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal)))
 
 (defun pynt-init (namespace)
@@ -845,7 +852,8 @@ Meant to be added to the hook
              (not pynt-lock)
              (member (buffer-file-name) pynt-code-buffer-file-names)
              (not (string= (buffer-file-name) pynt-code-buffer-file-name)))
-    (message "buffer-change: fname = %s" (buffer-file-name))
+    (setq pynt-code-buffer-name (buffer-name))
+    (pynt-log "buffer-change: fname = %s" (buffer-file-name))
     (pynt-switch-to-namespace pynt-namespace)
     (setq pynt-code-buffer-file-name (buffer-file-name))))
 
@@ -862,7 +870,8 @@ we hook into `buffer-list-update-hook' additionally."
                (not pynt-lock)
                (member fname pynt-code-buffer-file-names)
                (not (string= fname pynt-code-buffer-file-name)))
-      (message "window-change: fname = %s" fname)
+      (pynt-log "window-change: fname = %s" fname)
+      (setq pynt-code-buffer-name (buffer-name))
       (pynt-switch-to-namespace pynt-namespace)
       (setq pynt-code-buffer-file-name fname))))
 
@@ -907,7 +916,7 @@ we hook into `buffer-list-update-hook' additionally."
         (add-hook 'window-configuration-change-hook 'pynt-rebalance-on-buffer-change nil :local)
         (add-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change nil :local)
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
-        (add-hook 'post-command-hook #'pynt-scroll-cell-window nil :local)
+        (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
 
         ;; Initialize servers.
         (pynt-start-epc-server)

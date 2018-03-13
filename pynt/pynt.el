@@ -372,26 +372,28 @@ deleted. Basically there is a bunch of data invalidation that I
 don't want to worry about at this time."
   (interactive)
   (save-selected-window
-    (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
-      (when cells
+    (let ((entries (gethash (line-number-at-pos) pynt-line-to-cell-map)))
+      (when entries
         (condition-case exception
-            (let* ((cell (nth pynt-nth-cell-instance cells))
-                   (cell-marker (ein:cell-location cell :input))
-                   (point-line (count-screen-lines (window-start) (point))))
-              (when cell-marker
-                (select-window (pynt-notebook-window))
-                (widen)
-                (goto-char cell-marker)
-                (recenter point-line)
-                (when pynt-scroll-narrow-view
-                  (beginning-of-line)
-                  (previous-line)
-                  (call-interactively 'set-mark-command)
-                  (call-interactively 'ein:worksheet-goto-next-input)
-                  (call-interactively 'ein:worksheet-goto-next-input)
-                  (previous-line)
-                  (call-interactively 'narrow-to-region)
-                  (beginning-of-buffer))))
+            (multiple-value-bind (namespace cell) (nth pynt-nth-cell-instance entries)
+              (if (string= namespace pynt-namespace)
+                  (let* ((cell-marker (ein:cell-location cell :input))
+                         (point-line (count-screen-lines (window-start) (point))))
+                    (when cell-marker
+                      (select-window (pynt-notebook-window))
+                      (widen)
+                      (goto-char cell-marker)
+                      (recenter point-line)
+                      (when pynt-scroll-narrow-view
+                        (beginning-of-line)
+                        (previous-line)
+                        (call-interactively 'set-mark-command)
+                        (call-interactively 'ein:worksheet-goto-next-input)
+                        (call-interactively 'ein:worksheet-goto-next-input)
+                        (previous-line)
+                        (call-interactively 'narrow-to-region)
+                        (beginning-of-buffer))))
+                (pynt-switch-to-namespace namespace)))
           ('error))))))
 
 (defun pynt-prev-cell-instance ()
@@ -629,8 +631,9 @@ code buffer."
             (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (setq new-cell cell)))
   (when (not (eq line-number -1))
-    (let ((previous-cells (gethash line-number pynt-line-to-cell-map)))
-      (puthash line-number (append previous-cells (list new-cell)) pynt-line-to-cell-map))))
+    (let ((previous-entries (gethash line-number pynt-line-to-cell-map))
+          (new-entry (list namespace new-cell)))
+      (puthash line-number (add-to-list 'previous-entries new-entry) pynt-line-to-cell-map))))
 
 (defun pynt-start-ast-server ()
   "Start python AST server."

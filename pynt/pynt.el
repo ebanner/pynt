@@ -268,17 +268,8 @@ Return a reference to the new window."
     new-window))
 
 (defun pynt-notebook-window ()
-  "Get the EIN notebook window.
-
-A reference to this window cannot be cached into a variable
-because if users delete the window and then bring it back up,
-it's a different window now."
-  (interactive)
-  (multiple-value-bind (notebook-buffer-name)
-      (intersection (ein:notebook-opened-buffer-names) (pynt-get-buffer-names-in-frame))
-    (if notebook-buffer-name
-        (get-buffer-window notebook-buffer-name)
-      nil)))
+  "Get the notebook window."
+  (get-buffer-window (ein:notebook-buffer (pynt-notebook))))
 
 (defun pynt-log (&rest args)
   "Log the message when the variable `pynt-verbose' is t.
@@ -300,9 +291,6 @@ Do nothing if the worksheet does not exist."
     (condition-case exception
         (while t (call-interactively 'ein:worksheet-kill-cell))
       ('error))))
-
-(defun pynt-notebook-buffer-window ()
-  (get-buffer-window (ein:notebook-buffer (pynt-notebook))))
 
 (defun pynt-get-buffer-names-in-frame ()
   "Get the buffer names in the active frame.
@@ -354,8 +342,7 @@ This is done by sending the code region out to the AST server
 where it is annotated with EPC calls and then the resulting code
 is sent to the IPython kernel to be executed."
   (interactive)
-  (setq pynt-lock nil                   ; release the lock
-        pynt-line-to-cell-map (make-hash-table :test 'equal))
+  (setq pynt-lock nil)
   (pynt-kill-cells pynt-namespace)
   (message "Notebook kernel session ID = %s" (ein:$kernel-session-id (pynt-notebook-kernel)))
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
@@ -384,30 +371,28 @@ case that the cell that did correspond to a line has since been
 deleted. Basically there is a bunch of data invalidation that I
 don't want to worry about at this time."
   (interactive)
-  (when pynt-line-to-cell-map           ; sometimes this is nil!
-    (save-selected-window
-      (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
-        (when cells
-          (condition-case exception
-              (let* ((cell (nth pynt-nth-cell-instance cells))
-                     (cell-marker (ein:cell-location cell :input))
-                     (point-line (count-screen-lines (window-start) (point)))
-                     (window (pynt-notebook-buffer-window)))
-                (when (and cell-marker (string= (buffer-name (marker-buffer cell-marker)) window))
-                  (select-window window)
-                  (widen)
-                  (goto-char cell-marker)
-                  (recenter point-line)
-                  (when pynt-scroll-narrow-view
-                    (beginning-of-line)
-                    (previous-line)
-                    (call-interactively 'set-mark-command)
-                    (call-interactively 'ein:worksheet-goto-next-input)
-                    (call-interactively 'ein:worksheet-goto-next-input)
-                    (previous-line)
-                    (call-interactively 'narrow-to-region)
-                    (beginning-of-buffer))))
-            ('error)))))))
+  (save-selected-window
+    (let ((cells (gethash (line-number-at-pos) pynt-line-to-cell-map)))
+      (when cells
+        (condition-case exception
+            (let* ((cell (nth pynt-nth-cell-instance cells))
+                   (cell-marker (ein:cell-location cell :input))
+                   (point-line (count-screen-lines (window-start) (point))))
+              (when cell-marker
+                (select-window (pynt-notebook-window))
+                (widen)
+                (goto-char cell-marker)
+                (recenter point-line)
+                (when pynt-scroll-narrow-view
+                  (beginning-of-line)
+                  (previous-line)
+                  (call-interactively 'set-mark-command)
+                  (call-interactively 'ein:worksheet-goto-next-input)
+                  (call-interactively 'ein:worksheet-goto-next-input)
+                  (previous-line)
+                  (call-interactively 'narrow-to-region)
+                  (beginning-of-buffer))))
+          ('error))))))
 
 (defun pynt-prev-cell-instance ()
   "Scroll the EIN worksheet to the next occurrence of the current code line.
@@ -437,9 +422,16 @@ This function is part of pynt scroll mode."
   (ein:$notebook-kernel (pynt-notebook)))
 
 (defun pynt-pop-up-notebook-buffer (buffer)
-  ;; Bring up the window
-  (let ((buf (window-normalize-buffer-to-switch-to buffer)))
-    (display-buffer buf nil)))
+  "Pop up the notebook window.
+
+If the notebook window is in the current frame then jump over to
+it and switch it out the correct notebook. Otherwise just use a
+modified version of the function `pop-to-buffer'."
+  (condition-case nil
+      (save-selected-window
+        (windmove-right)
+        (switch-to-buffer buffer))
+    (error nil (display-buffer (window-normalize-buffer-to-switch-to buffer) nil))))
 
 (defun pynt-rename-notebook ()
   "Rename the notebook to the current namespace."
@@ -915,6 +907,10 @@ exists we just switch to it."
       (pynt-switch-to-namespace namespace)
     (pynt-init namespace)))
 
+(defun pynt-invalidate-scroll-map (&optional a b c)
+  (message "Invalidating scroll map!")
+  (setq pynt-line-to-cell-map (make-hash-table :test 'equal)))
+
 (defun pynt-init (namespace)
   "Initialize a namespace.
 
@@ -990,6 +986,8 @@ we hook into `buffer-list-update-hook' additionally."
     (define-key map (kbd "C-c C-w") 'pynt-recover-notebook-window)
     (define-key map (kbd "C-c C-s") 'pynt-choose-namespace)
     (define-key map (kbd "C-c C-k") 'pynt-choose-jack-in-command)
+    (define-key map (kbd "<up>") 'pynt-next-cell-instance)
+    (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
     map))
 
 (define-minor-mode pynt-mode
@@ -1000,38 +998,26 @@ we hook into `buffer-list-update-hook' additionally."
   :lighter "pynt"
   (if pynt-mode
       (progn
+        ;; Hooks.
+        (add-hook 'window-configuration-change-hook 'pynt-rebalance-on-buffer-change nil :local)
+        (add-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change nil :local)
+        (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
+        (add-hook 'post-command-hook #'pynt-scroll-cell-window nil :local)
+
         ;; Initialize servers.
         (pynt-start-epc-server)
         (pynt-start-ast-server)
 
-        ;; Make a map containing the notebooks once and only once.
-        (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal))
+        ;; Variables.
+        (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
+              pynt-line-to-cell-map (make-hash-table :test 'equal)
+              pynt-nth-cell-instance 0)
 
-        ;; Set variables.
         (pynt-init (pynt-module-name)))
+
     (pynt-mode-deactivate)))
 
-(defvar pynt-scroll-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<up>") 'pynt-next-cell-instance)
-    (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
-    map))
-
-(define-minor-mode pynt-scroll-mode
-  "Minor mode for scrolling a EIN notebook side-by-side with code.
-
-\\{pynt-scroll-mode-map}"
-  :keymap pynt-scroll-mode-map
-  :lighter "pynt-scroll"
-  (if pynt-scroll-mode
-      (progn
-        (add-hook 'post-command-hook #'pynt-scroll-cell-window :local))
-    (remove-hook 'post-command-hook #'pynt-scroll-cell-window))
-  (setq pynt-nth-cell-instance 0))
-
 (when pynt-start-jupyter-server-on-startup (pynt-jupyter-server-start))
-(add-hook 'window-configuration-change-hook 'pynt-rebalance-on-buffer-change)
-(add-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change)
 
 (provide 'pynt)
 ;;; pynt.el ends here

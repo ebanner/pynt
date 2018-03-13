@@ -24,7 +24,7 @@ y"""
         self.assertNotIn('qux', out)
 
     def test_func(self):
-    code = """
+        code = """
 x
 def bar():
     pass
@@ -33,6 +33,10 @@ class Biz:
         pass
 def qux():
     pass
-y
-"""
-    namespace = 'foo.bar'
+y"""
+        namespace = 'foo.bar'
+        out = codebook.syntax.annotate(code, namespace)
+        self.assertIn('foo.bar', out)
+        self.assertNotIn('Biz', out)
+        self.assertNotIn('qux', out)
+        self.assertNotIn('baz', out)

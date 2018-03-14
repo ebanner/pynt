@@ -459,7 +459,7 @@ code into the notebook."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
-          (let ((command (car (pynt-jack-in-commands))))
+          (let ((command (pynt-jack-in-command)))
             (when command
               (pynt-jack-in command))))))))
 
@@ -704,6 +704,34 @@ then ask magit for the closest enclosing github repo root."
          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
     relative-dir-path))
 
+(defun pynt-jack-in-command ()
+  "Get the jack in command from pynt.json.
+
+Check override commands first then testable then in testing
+directory then matching a fallback command. If nothing matches
+then return nil."
+  (defun override-command ()
+    (let* ((override-cmds (alist-get 'override-commands (pynt-command-map)))
+           (override-cmd (alist-get (intern (pynt-project-relative-path)) override-cmds)))
+      override-cmd))
+
+  (defun testable-namespace ()
+    (let* ((testable-namespaces (alist-get 'testable (pynt-command-map)))
+           (testable-namespaces (append testable-namespaces nil))
+           (testable-command (member (pynt-project-relative-path) testable-namespaces)))
+      testable-command))
+
+  (defun test ()
+    (let* ((test-directory (alist-get 'directory (alist-get 'tests (pynt-command-map))))
+           (test-command (alist-get 'runner (alist-get 'tests (pynt-command-map)))))
+      (when (string-prefix-p test-directory (pynt-project-relative-path))
+        test-command)))
+
+  (cond ((override-command) (override-command))
+        ((testable-namespace) (testable-namespace))
+        ((test) (test))
+        (t (car (pynt-jack-in-commands)))))
+
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
 
@@ -739,9 +767,8 @@ pynt-embed to jack into the desired namespace."
 
 FIXME this can probably be sped up substantially."
   (defun directory-length (path) (length (split-string path "/")))
-  (let* ((symbol-patterns (mapcar 'car (pynt-command-map)))
+  (let* ((symbol-patterns (mapcar 'car (alist-get 'fallback-commands (pynt-command-map))))
          (patterns (mapcar 'symbol-name symbol-patterns))
-         (patterns (seq-filter (lambda (pattern) (not (string= "**" pattern))) patterns))
          (sorted-patterns
           (reverse
            (sort patterns
@@ -752,9 +779,8 @@ FIXME this can probably be sped up substantially."
          (globs (mapcar 'file-expand-wildcards sorted-patterns))
          (preds (mapcar (lambda (glob) (member path glob)) globs))
          (zip (mapcar* 'cons preds sorted-patterns))
-         (survivors (seq-filter (lambda (pair) (cdr pair)) zip))
-         (commands (mapcar 'cdr survivors)))
-    (add-to-list 'commands "**" :append)))
+         (survivors (seq-filter (lambda (pair) (car pair)) zip)))
+    (mapcar 'cdr survivors)))
 
 (defun pynt-jack-in-commands (&optional namespace)
   "Return the commands for NAMESPACE.
@@ -769,10 +795,9 @@ If there are no jack in commands for NAMESPACE then look for look
 for the default jack in commands identified by the identifier
 \"*\"."
   (with-current-buffer pynt-code-buffer-name
-    (let* ((command-map (pynt-command-map))
-           (command-vectors (append (mapcar (lambda (command) (alist-get (intern command) command-map)) (pynt-matching-jack-in-patterns))))
-           (command-lists (append (mapcar (lambda (vector) (append vector nil)) command-vectors))))
-      (apply 'append command-lists))))
+    (let* ((command-map (alist-get 'fallback-commands (pynt-command-map)))
+           (commands (mapcar (lambda (command) (alist-get (intern command) command-map)) (pynt-matching-jack-in-patterns))))
+      commands)))
 
 (defun pynt-choose-jack-in-command ()
   "Select the jack-in command.

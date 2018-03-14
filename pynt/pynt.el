@@ -252,8 +252,15 @@ will mess with the namespace naming convention that pynt uses."
       (epc:call-deferred pynt-ast-server 'parse_namespaces `(,code ,(pynt-module-name)))
       (deferred:nextc it
         (lambda (namespaces)
+          (defun annotate-namespace (namespace)
+            (multiple-value-bind (nothing name start-line end-line) namespace
+              (list (format "%s :: %s" name (pynt-jack-in-command name))
+                    name
+                    start-line
+                    end-line)))
+          (setq namespaces (mapcar 'annotate-namespace namespaces))
           (helm :sources
-                `((name . "Select Active Code Region")
+                `((name . "Choose a namespace to interact with")
                   (candidates . ,namespaces)
                   (action . (lambda (namespace)
                               (multiple-value-bind (name start-line end-line) namespace
@@ -704,27 +711,30 @@ then ask magit for the closest enclosing github repo root."
          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
     relative-dir-path))
 
-(defun pynt-jack-in-command ()
+(defun pynt-jack-in-command (&optional namespace)
   "Get the jack in command from pynt.json.
 
 Check override commands first then testable then in testing
 directory then matching a fallback command. If nothing matches
 then return nil."
+  (setq namespace (or namespace pynt-namespace)
+        namespace-project-relative-path (concat (pynt-project-relative-dir) namespace))
+
   (defun override-command ()
     (let* ((override-cmds (alist-get 'override-commands (pynt-command-map)))
-           (override-cmd (alist-get (intern (pynt-project-relative-path)) override-cmds)))
+           (override-cmd (alist-get (intern namespace-project-relative-path) override-cmds)))
       override-cmd))
 
   (defun testable-namespace ()
     (let* ((testable-namespaces (alist-get 'testable (pynt-command-map)))
-           (testable-namespaces (append testable-namespaces nil))
-           (testable-command (member (pynt-project-relative-path) testable-namespaces)))
-      testable-command))
+           (testable-namespaces (append testable-namespaces nil)))
+      (when (member namespace-project-relative-path testable-namespaces)
+          (alist-get 'runner (alist-get 'tests (pynt-command-map))))))
 
   (defun test ()
     (let* ((test-directory (alist-get 'directory (alist-get 'tests (pynt-command-map))))
            (test-command (alist-get 'runner (alist-get 'tests (pynt-command-map)))))
-      (when (string-prefix-p test-directory (pynt-project-relative-path))
+      (when (string-prefix-p test-directory namespace-project-relative-path)
         test-command)))
 
   (cond ((override-command) (override-command))
@@ -805,11 +815,10 @@ for the default jack in commands identified by the identifier
 Available commands include those in the file pynt.json whose key
 is the variable `pynt-active-namespace'."
   (interactive)
-  (let ((namespace-cmds (pynt-jack-in-commands)))
-    (helm :sources
-          `((name . "Select Jack-In Command")
-            (candidates . ,namespace-cmds)
-            (action . pynt-jack-in)))))
+  (helm :sources
+        `((name . ,(format "Namespace *%s* jack-in commands" pynt-namespace))
+          (candidates . ,(pynt-jack-in-commands))
+          (action . pynt-jack-in))))
 
 (defun pynt-jupyter-server-start ()
   "Start a jupyter notebook server.

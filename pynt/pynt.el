@@ -256,9 +256,9 @@ will mess with the namespace naming convention that pynt uses."
             (multiple-value-bind (nothing name start-line end-line) namespace
               (let* ((jack-in-command (pynt-jack-in-command name))
                      (test-runner-command (alist-get 'runner (alist-get 'tests (pynt-command-map))))
-                     (indicator (cond ((string= jack-in-command test-runner-command) (propertize "✓" 'face '(:foreground "green" :face "bold")))
-                                      (jack-in-command (propertize "►" 'face '(:foreground "yellow" :face "bold")))
-                                      (t (propertize "✗" 'face '(:foreground "red" :face "bold"))))))
+                     (indicator (cond ((string= jack-in-command test-runner-command) (propertize "✓" 'face '(:foreground "green")))
+                                      (jack-in-command (propertize "►" 'face '(:foreground "yellow")))
+                                      (t (propertize "✗" 'face '(:foreground "red"))))))
                 (list (format "[%s] %s :: %s"
                               indicator
                               name
@@ -510,8 +510,14 @@ code into the notebook."
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
           (let ((command (pynt-jack-in-command)))
-            (when command
-              (pynt-jack-in command))))))))
+            (pynt-kill-cells)
+            (if command
+                (pynt-jack-in command)
+              (pynt-make-cell (format "No jack-in command for the namespace `%s`..." pynt-namespace) pynt-namespace "1" -1)
+              (pynt-make-cell
+               "In order to create a jack-in command then either
+write a test or add a lazy command to `pynt.json'."
+               pynt-namespace "markdown" -1))))))))
 
 (defun pynt-command-map ()
   "Get the command map.
@@ -817,7 +823,6 @@ buffer to EIN. Otherwise make a call out to the external script
 pynt-embed to jack into the desired namespace."
   (interactive)
   (when namespace (setq pynt-namespace namespace))
-  (pynt-kill-cells)
   (pynt-make-cell (format "Initializing kernel for `%s`..." pynt-namespace) pynt-namespace "1" -1)
   (with-current-buffer pynt-code-buffer-name
     (if (string= command "ein:connect-run-or-eval-buffer")

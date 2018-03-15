@@ -254,15 +254,18 @@ will mess with the namespace naming convention that pynt uses."
         (lambda (namespaces)
           (defun annotate-namespace (namespace)
             (multiple-value-bind (nothing name start-line end-line) namespace
-              (let ((jack-in-command (pynt-jack-in-command name))
-                    (test-runner-command (alist-get 'runner (alist-get 'tests (pynt-command-map)))))
-                (list (format "[%s] %s :: %s" (if (string= jack-in-command test-runner-command) "✓" "✗") name jack-in-command)
+              (let* ((jack-in-command (pynt-jack-in-command name))
+                     (test-runner-command (alist-get 'runner (alist-get 'tests (pynt-command-map))))
+                     (indicator (cond ((string= jack-in-command test-runner-command) "★")
+                                      (jack-in-command "✓")
+                                      (t "✗"))))
+                (list (format "[%s] %s :: %s" indicator name jack-in-command)
                       name
                       start-line
                       end-line))))
           (setq namespaces (mapcar 'annotate-namespace namespaces))
           (helm :sources
-                `((name . "Choose a namespace to interact with")
+                `((name . "Namespace to dump into a jupyter notebook")
                   (candidates . ,namespaces)
                   (action . (lambda (namespace)
                               (multiple-value-bind (name start-line end-line) namespace
@@ -477,7 +480,8 @@ code into the notebook."
   "Get the command map.
 
 Read the pynt.json file in the project root."
-  (json-read-file (concat (pynt-project-root) "pynt.json")))
+  (let ((json-array-type 'list))
+    (json-read-file (concat (pynt-project-root) "pynt.json"))))
 
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side.
@@ -733,36 +737,37 @@ then ask magit for the closest enclosing github repo root."
          (relative-dir-path (replace-regexp-in-string project-path "" absolute-dir-path)))
     relative-dir-path))
 
+(defun pynt-test-runner ()
+  "Return the test runner command."
+  (let ((test-info (alist-get 'tests (pynt-command-map))))
+    (alist-get 'runner test-info)))
+
 (defun pynt-jack-in-command (&optional namespace)
   "Get the jack in command from pynt.json.
 
-Check override commands first then testable then in testing
-directory then matching a fallback command. If nothing matches
-then return nil."
+Modules have a different rule than functions/methods. Modules check the "
   (setq namespace (or namespace pynt-namespace)
         namespace-project-relative-path (concat (pynt-project-relative-dir) namespace))
 
-  (defun override-command ()
-    (let* ((override-cmds (alist-get 'override-commands (pynt-command-map)))
-           (override-cmd (alist-get (intern namespace-project-relative-path) override-cmds)))
-      override-cmd))
+  (defun test-p (namespace)
+    "t if NAMESPACE is in the tests directory and nil otherwise."
+    (let* ((test-directory (alist-get 'directory (alist-get 'tests (pynt-command-map)))))
+      (string-prefix-p test-directory namespace-project-relative-path)))
 
-  (defun testable-namespace ()
-    (let* ((testable-namespaces (alist-get 'testable (pynt-command-map)))
-           (testable-namespaces (append testable-namespaces nil)))
-      (when (member namespace-project-relative-path testable-namespaces)
-          (alist-get 'runner (alist-get 'tests (pynt-command-map))))))
+  (defun testable-p (namespace)
+    "t if NAMESPACE is in the tests directory and nil otherwise."
+    (member namespace-project-relative-path (alist-get 'testable (pynt-command-map))))
 
-  (defun test ()
-    (let* ((test-directory (alist-get 'directory (alist-get 'tests (pynt-command-map))))
-           (test-command (alist-get 'runner (alist-get 'tests (pynt-command-map)))))
-      (when (string-prefix-p test-directory namespace-project-relative-path)
-        test-command)))
+  (defun lazy-command (namespace)
+    "t if NAMESPACE is in the tests directory and nil otherwise."
+    (let ((lazy-commands (alist-get 'lazy-commands (pynt-command-map))))
+      (alist-get (intern namespace-project-relative-path) lazy-commands)))
 
-  (cond ((override-command) (override-command))
-        ((testable-namespace) (testable-namespace))
-        ((test) (test))
-        (t (car (pynt-jack-in-commands)))))
+  (if (string-match-p (regexp-quote ".") namespace)
+      (cond ((lazy-command namespace) (lazy-command namespace))
+            ((or (testable-p namespace) (test-p namespace)) (pynt-test-runner))
+            (t nil))
+    (car (pynt-module-commands))))
 
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
@@ -805,12 +810,12 @@ $ %s
                         "-cmd" command))
        'pynt-switch-kernel))))
 
-(defun pynt-matching-jack-in-patterns ()
+(defun pynt-matching-module-patterns ()
   "Get the patterns which match this file in pynt.json.
 
 FIXME this can probably be sped up substantially."
   (defun directory-length (path) (length (split-string path "/")))
-  (let* ((symbol-patterns (mapcar 'car (alist-get 'fallback-commands (pynt-command-map))))
+  (let* ((symbol-patterns (mapcar 'car (alist-get 'module-commands (pynt-command-map))))
          (patterns (mapcar 'symbol-name symbol-patterns))
          (sorted-patterns
           (reverse
@@ -825,7 +830,7 @@ FIXME this can probably be sped up substantially."
          (survivors (seq-filter (lambda (pair) (car pair)) zip)))
     (mapcar 'cdr survivors)))
 
-(defun pynt-jack-in-commands (&optional namespace)
+(defun pynt-module-commands (&optional namespace)
   "Return the commands for NAMESPACE.
 
 Commands are in \"pynt-project-dir/pynt.json\".
@@ -838,8 +843,8 @@ If there are no jack in commands for NAMESPACE then look for look
 for the default jack in commands identified by the identifier
 \"*\"."
   (with-current-buffer pynt-code-buffer-name
-    (let* ((command-map (alist-get 'fallback-commands (pynt-command-map)))
-           (commands (mapcar (lambda (command) (alist-get (intern command) command-map)) (pynt-matching-jack-in-patterns))))
+    (let* ((command-map (alist-get 'module-commands (pynt-command-map)))
+           (commands (mapcar (lambda (command) (alist-get (intern command) command-map)) (pynt-matching-module-patterns))))
       commands)))
 
 (defun pynt-choose-jack-in-command ()
@@ -850,7 +855,7 @@ is the variable `pynt-active-namespace'."
   (interactive)
   (helm :sources
         `((name . ,(format "Namespace *%s* jack-in commands" pynt-namespace))
-          (candidates . ,(pynt-jack-in-commands))
+          (candidates . (,(pynt-jack-in-command)))
           (action . pynt-jack-in))))
 
 (defun pynt-jupyter-server-start ()

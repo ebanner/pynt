@@ -254,10 +254,12 @@ will mess with the namespace naming convention that pynt uses."
         (lambda (namespaces)
           (defun annotate-namespace (namespace)
             (multiple-value-bind (nothing name start-line end-line) namespace
-              (list (format "%s :: %s" name (pynt-jack-in-command name))
-                    name
-                    start-line
-                    end-line)))
+              (let ((jack-in-command (pynt-jack-in-command name))
+                    (test-runner-command (alist-get 'runner (alist-get 'tests (pynt-command-map)))))
+                (list (format "[%s] %s :: %s" (if (string= jack-in-command test-runner-command) "✓" "✗") name jack-in-command)
+                      name
+                      start-line
+                      end-line))))
           (setq namespaces (mapcar 'annotate-namespace namespaces))
           (helm :sources
                 `((name . "Choose a namespace to interact with")
@@ -694,7 +696,6 @@ pynt-embed finishes."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
-          (pynt-offload-to-scratch-worksheet)
           (pynt-init-epc-client "pass" 'pynt-dump-namespace))))))
 
 (defun pynt-run-all-cells-above ()

@@ -314,9 +314,43 @@ is sent to the IPython kernel to be executed."
       (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace))
       (deferred:nextc it
         (lambda (annotated-code)
-          (pynt-log "Annotated code = %S" annotated-code)
           (ein:connect-eval-buffer)
+          (pynt-log "Annotated code = %s" annotated-code)
           (ein:shared-output-eval-string annotated-code))))))
+
+(defun pynt-rewrite-for ()
+  "Delete the corresponding for loop and unroll it once.
+
+TODO do a pure tranformation from code to cell command creation.
+That is don't actually run the code. Just create the cells."
+  (let* ((cell (pynt-get-cell-at-pos))
+         (for-loop (pynt-get-cell-contents cell)))
+    (with-current-buffer (pynt-notebook-buffer)
+      (ein:cell-goto cell)
+      (call-interactively 'ein:worksheet-kill-cell))
+    (pynt-log "for-loop = %S" for-loop)
+    (deferred:$
+      (epc:call-deferred pynt-ast-server 'promote_loop `(,for-loop ,pynt-namespace))
+      (deferred:nextc it
+        (lambda (unrolled-for)
+          (epc:call-deferred pynt-ast-server 'annotate_toplevel `(,unrolled-for ,pynt-namespace))
+          (deferred:nextc it
+            (lambda (annotated-code)
+              (pynt-log "Annotated code = %s" annotated-code)
+              (ein:shared-output-eval-string annotated-code)))
+          (foo unrolled-for))))))
+
+(defun pynt-get-cell-at-pos ()
+  "Get the cell corresponding to the current line number."
+  (let* ((entries (gethash (line-number-at-pos) pynt-line-to-cell-map))
+         (entry (car entries)))
+    (multiple-value-bind (namespace cell) entry
+      cell)))
+
+(defun pynt-get-cell-contents (cell)
+  "Get the contents of the input area of CELL."
+  (with-current-buffer (pynt-notebook-buffer)
+    (substring-no-properties (ein:cell-get-text cell))))
 
 (defun pynt-scroll-cell-window ()
   "Scroll the EIN worksheet buffer with the code buffer.

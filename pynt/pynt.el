@@ -767,7 +767,9 @@ Modules have a different rule than functions/methods. Modules check the "
       (cond ((lazy-command namespace) (lazy-command namespace))
             ((or (testable-p namespace) (test-p namespace)) (pynt-test-runner))
             (t nil))
-    (car (pynt-module-commands))))
+    (if (test-p namespace)
+        (pynt-test-runner)              ; still might be a test module
+      (car (pynt-module-commands)))))
 
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.

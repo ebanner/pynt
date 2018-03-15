@@ -256,10 +256,13 @@ will mess with the namespace naming convention that pynt uses."
             (multiple-value-bind (nothing name start-line end-line) namespace
               (let* ((jack-in-command (pynt-jack-in-command name))
                      (test-runner-command (alist-get 'runner (alist-get 'tests (pynt-command-map))))
-                     (indicator (cond ((string= jack-in-command test-runner-command) "★")
-                                      (jack-in-command "✓")
-                                      (t "✗"))))
-                (list (format "[%s] %s :: %s" indicator name jack-in-command)
+                     (indicator (cond ((string= jack-in-command test-runner-command) (propertize "✓" 'face '(:foreground "green" :face "bold")))
+                                      (jack-in-command (propertize "►" 'face '(:foreground "yellow" :face "bold")))
+                                      (t (propertize "✗" 'face '(:foreground "red" :face "bold"))))))
+                (list (format "[%s] %s :: %s"
+                              indicator
+                              name
+                              jack-in-command)
                       name
                       start-line
                       end-line))))

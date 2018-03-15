@@ -277,19 +277,18 @@ you shouldn't have to use it."
   (interactive)
   (pynt-pop-up-notebook-buffer (pynt-notebook-buffer)))
 
-(defun pynt-kill-cells (namespace)
-  "Delete all the cells in the NAMESPACE worksheet.
+(defun pynt-kill-cells ()
+  "Delete all the cells in the notebook.
 
-Argument NAMESPACE is the namespace of the worksheet for which we
-are killing all the cells.
-
-Do nothing if the worksheet does not exist."
+If the argument OTHER-WORKSHEET is non-nil then use the other
+worksheet."
   (interactive)
-  (with-current-buffer (pynt-notebook-buffer-name)
+  (with-current-buffer (pynt-notebook-buffer)
     (beginning-of-buffer)
     (condition-case exception
         (while t (call-interactively 'ein:worksheet-kill-cell))
-      ('error))))
+      ('error))
+    (beginning-of-buffer)))
 
 (defun pynt-dump-namespace ()
   "Dump the code in `pynt-active-namespace' into its EIN worksheet buffer.
@@ -299,7 +298,7 @@ where it is annotated with EPC calls and then the resulting code
 is sent to the IPython kernel to be executed."
   (interactive)
   (setq pynt-lock nil)
-  (pynt-kill-cells pynt-namespace)
+  (pynt-offload-to-scratch-worksheet)
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (pynt-log "Dumping the namespace!")
@@ -416,7 +415,7 @@ working."
   (deferred:nextc it
     (lambda (msg)
       (with-current-buffer pynt-code-buffer-name
-        (with-current-buffer (pynt-notebook-buffer-name)
+        (with-current-buffer (pynt-notebook-buffer)
           (ein:notebook-rename-command pynt-notebook-path)))
       'notebook-rename-initiated))
 
@@ -444,14 +443,16 @@ code into the notebook."
   (setq notebook ein:%notebook%)
   (with-current-buffer pynt-code-buffer-name
     (pynt-log "Putting %s into hash..." pynt-namespace)
-    (puthash pynt-namespace notebook pynt-namespace-to-notebook-map))
+    (puthash pynt-namespace notebook pynt-namespace-to-notebook-map)
+    (with-current-buffer (pynt-notebook-buffer)
+      (ein:notebook-worksheet-insert-next ein:%notebook% ein:%worksheet% :render nil)))
 
   (deferred:$
     ;; Connect code buffer to notebook.
     (deferred:next
       (lambda ()
         (with-current-buffer pynt-code-buffer-name
-          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name)))))
+          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer)))))
 
     ;; Poll until code buffer is connected.
     (deferred:nextc it
@@ -573,7 +574,7 @@ code buffer."
   ;; These variables are buffer local so we need to grab them before switching
   ;; over to the worksheet buffer.
   (setq new-cell nil)                   ; new cell to be added
-  (with-current-buffer (pynt-notebook-buffer-name)
+  (with-current-buffer (pynt-notebook-buffer)
     (end-of-buffer)
     (call-interactively 'ein:worksheet-insert-cell-below)
     (insert expr)
@@ -583,6 +584,8 @@ code buffer."
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
             (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (setq new-cell cell)))
+  (with-selected-window (pynt-notebook-window)
+    (beginning-of-buffer))
   (when (not (eq line-number -1))
     (let ((previous-entries (gethash line-number pynt-line-to-cell-map))
           (new-entry (list namespace new-cell)))
@@ -639,6 +642,19 @@ Argument BUFFER-OR-NAME the name of the notebook we are connecting to."
   (pynt-log "Setting main worksheet name = %S" buffer-or-name)
   (apply old-function (list buffer-or-name)))
 
+(defun pynt-offload-to-scratch-worksheet ()
+  "Move cells from the main notebook to the scratch notebook."
+  (interactive)
+  (with-current-buffer (pynt-notebook-buffer)
+    (beginning-of-buffer)
+    (push-mark (point-max))
+    (activate-mark)
+    (call-interactively 'ein:worksheet-kill-cell)
+    (let ((worksheets (ein:$notebook-worksheets ein:%notebook%)))
+      (with-current-buffer (ein:worksheet-buffer (nth 1 worksheets))
+        (beginning-of-buffer)
+        (call-interactively 'ein:worksheet-yank-cell)))))
+
 (defun pynt-switch-kernel (process event)
   "Switch to most recently started kernel.
 
@@ -648,6 +664,10 @@ recently started kernel.
 
 This function is meant to be used as a sentinel after the process
 pynt-embed finishes."
+  (pynt-make-cell (format "Jack in command %s" event)
+                  pynt-namespace
+                  "markdown"
+                  -1)
   (select-window (get-buffer-window "*pynt code*"))
   (pynt-log "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
   (set-visited-file-name pynt-code-buffer-file-name)
@@ -674,6 +694,7 @@ pynt-embed finishes."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
+          (pynt-offload-to-scratch-worksheet)
           (pynt-init-epc-client "pass" 'pynt-dump-namespace))))))
 
 (defun pynt-run-all-cells-above ()
@@ -751,8 +772,9 @@ buffer to EIN. Otherwise make a call out to the external script
 pynt-embed to jack into the desired namespace."
   (interactive)
   (when namespace (setq pynt-namespace namespace))
+  (pynt-kill-cells)
+  (pynt-make-cell "Initializing your kernel..." pynt-namespace "1" -1)
   (with-current-buffer pynt-code-buffer-name
-    (pynt-log "Jacking into namespace = %s with command = %s..." pynt-namespace command)
     (if (string= command "ein:connect-run-or-eval-buffer")
         (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)
 
@@ -764,7 +786,17 @@ pynt-embed to jack into the desired namespace."
       (set-process-sentinel
        (let* ((default-directory (pynt-project-root))
               (namespace-path (concat (pynt-project-relative-dir) pynt-namespace)))
-         (pynt-log "Calling pynt-embed -namespace %s -cmd %s..." namespace-path command)
+         (pynt-make-cell (format "Jacking into namespace `%s` with the command
+
+```
+$ %s
+```
+
+..." pynt-namespace command)
+                         pynt-namespace
+                         "markdown"
+                         -1)
+         (pynt-log "Calling pynt-embed -namespace %s -cmd %s ..." namespace-path command)
          (start-process "PYNT Kernel"
                         "*pynt-kernel*"
                         "pynt-embed"
@@ -855,7 +887,7 @@ won't run until this finishes."
       (lambda ()
         (with-current-buffer pynt-code-buffer-name
           (pynt-log "Connecting to code buffer to notebook...")
-          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer-name)))))))
+          (pynt-connect-to-notebook-buffer (pynt-notebook-buffer)))))))
 
 (defun pynt-connect-to-notebook-buffer (notebook-buffer-name)
   (ein:connect-to-notebook-buffer notebook-buffer-name)

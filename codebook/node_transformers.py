@@ -429,6 +429,42 @@ class FunctionExploder(ast.NodeTransformer):
 
         return exprs + func.body
 
+class FirstPassForSimple(ast.NodeTransformer):
+    def __init__(self, buffer):
+        self.buffer = buffer
+
+    def visit_For(self, loop):
+        """Pure syntax rewrite of a for loop
+
+        Unroll only the first iteration through the loop.
+
+        """
+        loop = self.generic_visit(loop)
+
+        # iter(loop.iter)
+        iter_call = ast.Call(
+            func=ast.Name(id='iter', ctx=ast.Load()),
+            args=[ast.Name(id=loop.iter, ctx=ast.Load())],
+            keywords=[]
+        )
+
+        # i = next(iter(loop.iter))
+        get_first = ast.Assign(
+            targets=[loop.target],
+            value=ast.Call(
+                func=ast.Name(id='next', ctx=ast.Load()),
+                args=[iter_call],
+                keywords=[]
+            )
+        )
+        content = f'`for {astor.to_source(loop.target).strip()} in {astor.to_source(loop.iter).strip()} ...`'
+        nodes = []
+        nodes.append(Annotator.make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno))
+        nodes.append(ast.Expr(loop.iter))
+        nodes.append(get_first)
+        nodes.extend(loop.body)
+        return nodes
+
 class FirstPassFor(ast.NodeTransformer):
     """Performs pure syntax rewrites
 

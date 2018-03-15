@@ -4,9 +4,9 @@ import ast
 
 import astor
 
-from codebook.node_transformers import (Annotator, FunctionExploder,
-                                        IPythonEmbedder, LineNumberFinder,
-                                        SyntaxRewriter)
+from codebook.node_transformers import (Annotator, FirstPassForSimple,
+                                        FunctionExploder, IPythonEmbedder,
+                                        LineNumberFinder, SyntaxRewriter)
 
 
 def annotate(*region):
@@ -222,3 +222,41 @@ def find_namespace(code, func_name, lineno):
     except Exception as e:
         namespace, = e.args
     return namespace
+
+def promote_loop(*region):
+    """
+
+    >>> code = '''
+    ...
+    ... for i in range(5):
+    ...     for j in range(5):
+    ...         k = i = j
+    ...         print(k)
+    ...
+    ... '''
+
+    """
+    code, namespace = region
+    tree = ast.parse(code)
+    m = FirstPassForSimple(buffer=namespace).visit(tree)
+    return astor.to_source(m)
+
+def annotate_toplevel(*region):
+    """
+
+    >>> code = '''
+    ...
+    ... for i in range(5):
+    ...     for j in range(5):
+    ...         k = i = j
+    ...         print(k)
+    ...
+    ... '''
+    >>> namespace = 'foo'
+    >>> region = [code, namespace]
+
+    """
+    code, namespace = region
+    tree = ast.parse(code)
+    annotated_tree = Annotator(buffer=namespace).visit(tree)
+    return astor.to_source(annotated_tree)

@@ -8,7 +8,9 @@ import codebook.syntax
 funcs = [
     codebook.syntax.annotate,
     codebook.syntax.parse_namespaces,
-    codebook.syntax.embed
+    codebook.syntax.embed,
+    codebook.syntax.promote_loop,
+    codebook.syntax.annotate_toplevel,
 ]
 
 if __name__ == '__main__':

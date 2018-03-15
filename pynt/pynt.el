@@ -779,7 +779,7 @@ pynt-embed to jack into the desired namespace."
   (interactive)
   (when namespace (setq pynt-namespace namespace))
   (pynt-kill-cells)
-  (pynt-make-cell "Initializing your kernel..." pynt-namespace "1" -1)
+  (pynt-make-cell (format "Initializing kernel for `%s`..." pynt-namespace) pynt-namespace "1" -1)
   (with-current-buffer pynt-code-buffer-name
     (if (string= command "ein:connect-run-or-eval-buffer")
         (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)

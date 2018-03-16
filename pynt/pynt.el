@@ -547,11 +547,10 @@ Read the pynt.json file in the project root."
     (pynt-write-json-file command-map)))
 
 (defun pynt-write-json-file (json-alist)
-  (with-current-buffer (get-file-buffer (pynt-json-path))
-    (erase-buffer)
+  (with-temp-buffer
     (insert (json-encode json-alist))
     (json-pretty-print-buffer)
-    (save-buffer)))
+    (write-file (pynt-json-path))))
 
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side.

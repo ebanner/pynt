@@ -171,6 +171,14 @@ cell (e.g. a line in the body of a for loop.")
 
 Each namespace has its own indepenedent notebook.")
 
+(defvar-local pynt-namespace-to-kernel-pid-map nil
+  "Map of namespaces to kernel PIDs.
+
+Every time one sets up the state of a notebook by jacking in a
+subprocess is started which starts the kernel. These add up after
+a while and it is in our interest to kill those processes when
+their associated kernels can no longer be interacted with.")
+
 (defvar-local pynt-namespace-to-region-map nil
   "Map of namespace names to start and end lines.
 
@@ -739,13 +747,26 @@ recently started kernel.
 
 This function is meant to be used as a sentinel after the process
 pynt-embed finishes."
+  (select-window (get-buffer-window "*pynt code*"))
+  (pynt-log "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
+  (set-visited-file-name pynt-code-buffer-file-name)
+
+  ;; Kill an existing kernel process if there is one.
+  (pynt-log "Checking %S active kernel..." pynt-namespace)
+  (when (gethash pynt-namespace pynt-namespace-to-kernel-pid-map)
+    (start-process "Kill PYNT Kernel" "*pynt kill kernel*" "kill" (gethash pynt-namespace pynt-namespace-to-kernel-pid-map)))
+
+  (pynt-log "Recording new kernel PID...")
+  (with-temp-buffer
+    (insert-file-contents "~/.pynt")
+    (setq new-kernel-pid (string-trim (buffer-string))))
+  (when new-kernel-pid
+    (puthash pynt-namespace new-kernel-pid pynt-namespace-to-kernel-pid-map))
+
   (pynt-make-cell (format "Jack in command %s" event)
                   pynt-namespace
                   "markdown"
                   -1)
-  (select-window (get-buffer-window "*pynt code*"))
-  (pynt-log "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
-  (set-visited-file-name pynt-code-buffer-file-name)
 
   (deferred:$
     ;; Restart the kernel.
@@ -874,8 +895,8 @@ $ %s
                          "markdown"
                          -1)
          (pynt-log "Calling pynt-embed -namespace %s -cmd %s ..." namespace-path command)
-         (start-process "PYNT Kernel"
-                        "*pynt-kernel*"
+         (start-process "PYNT Embed"
+                        "*pynt-embed*"
                         "pynt-embed"
                         "-namespace" namespace-path
                         "-cmd" command))
@@ -1072,12 +1093,24 @@ we hook into `buffer-list-update-hook' additionally."
   (remove-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change :local)
   (remove-hook 'after-change-functions 'pynt-invalidate-scroll-map :local)
   (remove-hook 'post-command-hook #'pynt-scroll-cell-window :local)
+  (remove-hook 'kill-emacs-hook 'pynt-mode-deactivate :local)
 
-  ;; Remove notebooks.
-  (delete-window (pynt-notebook-window))
-  (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
-    (with-current-buffer (pynt-notebook-buffer namespace)
-      (call-interactively 'ein:notebook-kill-kernel-then-close-command)))
+  ;; Remove notebook. Sometimes this fails when invoked via the
+  ;; `kill-emacs-hook'. Leave it to EIN clean up the notebooks in that case.
+  (condition-case nil
+      (when (pynt-notebook-window)
+        (delete-window (pynt-notebook-window)))
+      (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
+        (with-current-buffer (pynt-notebook-buffer namespace)
+          (call-interactively 'ein:notebook-kill-kernel-then-close-command)))
+    (error nil))
+
+  ;; Kill dangling kernel processes.
+  (let ((kernel-pids (map-values pynt-namespace-to-kernel-pid-map)))
+    (when kernel-pids
+      (message "Killing pynt kernels...")
+      (apply 'call-process (append (list "kill" nil nil nil)
+                                   kernel-pids))))
 
   ;; Remove code buffer from global list.
   (delete (buffer-file-name) pynt-code-buffer-file-names))
@@ -1105,6 +1138,7 @@ we hook into `buffer-list-update-hook' additionally."
         (add-hook 'buffer-list-update-hook 'pynt-rebalance-on-window-change nil :local)
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
         (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
+        (add-hook 'kill-emacs-hook 'pynt-mode-deactivate nil :local)
 
         ;; Initialize servers.
         (pynt-start-epc-server)
@@ -1112,6 +1146,7 @@ we hook into `buffer-list-update-hook' additionally."
 
         ;; Variables.
         (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
+              pynt-namespace-to-kernel-pid-map (make-hash-table :test 'equal)
               pynt-line-to-cell-map (make-hash-table :test 'equal)
               pynt-nth-cell-instance 0)
 

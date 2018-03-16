@@ -515,16 +515,43 @@ code into the notebook."
                 (pynt-jack-in command)
               (pynt-make-cell (format "No jack-in command for the namespace `%s`..." pynt-namespace) pynt-namespace "1" -1)
               (pynt-make-cell
-               "In order to create a jack-in command then either
-write a test or add a lazy command to `pynt.json'."
-               pynt-namespace "markdown" -1))))))))
+               "In order to create a jack-in command then press
+`C-c C-k` to select a jack-in command." pynt-namespace "markdown" -1))))))))
 
 (defun pynt-command-map ()
   "Get the command map.
 
 Read the pynt.json file in the project root."
   (let ((json-array-type 'list))
-    (json-read-file (concat (pynt-project-root) "pynt.json"))))
+    (json-read-file (pynt-json-path))))
+
+(defun pynt-json-path ()
+  (concat (pynt-project-root) "pynt.json"))
+
+(defun pynt-lazy-commands ()
+  (let ((lazy-command-map (alist-get 'lazy-commands (pynt-command-map))))
+    (mapcar 'cdr lazy-command-map)))
+
+(defun pynt-add-lazy-command (command)
+  (let* ((command-map (pynt-command-map))
+         (lazy-commands (alist-get 'lazy-commands command-map)))
+    (add-to-list 'lazy-commands (cons (pynt-project-relative-path pynt-namespace) command))
+    (setcdr (assoc 'lazy-commands command-map) lazy-commands)
+    (pynt-write-json-file command-map)))
+
+(defun pynt-add-testable (namespace)
+  (let* ((command-map (pynt-command-map))
+         (testable-namespaces (alist-get 'testable command-map)))
+    (add-to-list 'testable-namespaces namespace)
+    (setcdr (assoc 'testable command-map) testable-namespaces)
+    (pynt-write-json-file command-map)))
+
+(defun pynt-write-json-file (json-alist)
+  (with-current-buffer (get-file-buffer (pynt-json-path))
+    (erase-buffer)
+    (insert (json-encode json-alist))
+    (json-pretty-print-buffer)
+    (save-buffer)))
 
 (defun pynt-new-notebook ()
   "Create a new EIN notebook and bring it up side-by-side.

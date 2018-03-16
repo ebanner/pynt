@@ -171,6 +171,12 @@ cell (e.g. a line in the body of a for loop.")
 
 Each namespace has its own indepenedent notebook.")
 
+(defvar-local pynt-notebook-files nil
+  "List of EIN notebook files.
+
+Keep track of this so we delete all the notebooks when
+terminating pynt mode.")
+
 (defvar-local pynt-namespace-to-kernel-pid-map nil
   "Map of namespaces to kernel PIDs.
 
@@ -440,45 +446,21 @@ modified version of the function `pop-to-buffer'."
 (defun pynt-rename-notebook ()
   "Rename the notebook to the current namespace.
 
-TODO this is currently not used but would be nice to get
-working."
-
-  (pynt-log "Setting notebook name variable...")
+TODO I've tried to get this working twice and it leads to weird
+errors each time. It would be very nice to get working eventually!"
+  (interactive)
   (let* ((relative-path (replace-regexp-in-string (expand-file-name "~/") "" (buffer-file-name)))
          (relative-dir (file-name-directory relative-path))
-         (notebook-name (concat relative-dir pynt-namespace ".ipynb")))
-    (setq pynt-notebook-path))
-
-  (delete-file (file-name-nondirectory pynt-notebook-path))
-
-  ;; Poll until notebook file is deleted.
-  (deferred:nextc it
-    (deferred:lambda (msg)
-      (if (not (file-exists-p (file-name-nondirectory pynt-notebook-path)))
-          (progn
-            (pynt-log "%s is deleted! Renaming notebook to %s..." (file-name-nondirectory pynt-notebook-path) pynt-notebook-path)
-            'notebook-is-deleted)
-        (pynt-log "%s still exists..." (file-name-nondirectory pynt-notebook-path))
-        (deferred:nextc (deferred:wait 500) self))))
-
-  ;; Rename the notebook.
-  (deferred:nextc it
-    (lambda (msg)
-      (with-current-buffer pynt-code-buffer-name
-        (with-current-buffer (pynt-notebook-buffer)
-          (ein:notebook-rename-command pynt-notebook-path)))
-      'notebook-rename-initiated))
-
-  ;; Poll until notebook is renamed.
-  (deferred:next
-    (deferred:lambda ()
-      (with-current-buffer pynt-code-buffer-name
-        (if (string= (ein:$notebook-notebook-path (pynt-notebook)) pynt-notebook-path)
-            (progn
-              (pynt-log "[2] : Notebook name is set!")
-              'pynt-connected)
-          (pynt-log "Still waiting for notebook name to change...")
-          (deferred:nextc (deferred:wait 500) self))))))
+         (notebook-path (concat relative-dir pynt-namespace ".ipynb")))
+    (condition-case nil
+        (delete-file (file-name-nondirectory notebook-path))
+      (error nil))
+    (with-current-buffer (pynt-notebook-buffer)
+      (message "Attempting rename to %s..." notebook-path)
+      (let* ((old-notebook-path (ein:$notebook-notebook-path ein:%notebook%))
+             (old-notebook-name (file-name-nondirectory old-notebook-path)))
+        (ein:notebook-rename-command notebook-path)
+        (delete-file old-notebook-name)))))
 
 (defun pynt-setup-notebook (&rest -ignore-)
   "Default callback for `ein:notebook-open'.
@@ -486,7 +468,6 @@ working."
 After popping open the notebook in a window jack into the
 namespace if there is a command in pynt.json. Finally dump the
 code into the notebook."
-
   ;; Pop up notebook.
   (pynt-pop-up-notebook-buffer (current-buffer))
 
@@ -494,6 +475,7 @@ code into the notebook."
   (with-current-buffer pynt-code-buffer-name
     (pynt-log "Putting %s into hash..." pynt-namespace)
     (puthash pynt-namespace notebook pynt-namespace-to-notebook-map)
+    (add-to-list 'pynt-notebook-files (ein:notebook-name notebook))
     (with-current-buffer (pynt-notebook-buffer)
       (ein:notebook-worksheet-insert-next ein:%notebook% ein:%worksheet% :render nil)))
 
@@ -517,8 +499,8 @@ code into the notebook."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
+          (pynt-kill-cells)
           (let ((command (pynt-jack-in-command)))
-            (pynt-kill-cells)
             (if command
                 (pynt-jack-in command)
               (pynt-make-cell (format "No jack-in command for the namespace `%s`..." pynt-namespace) pynt-namespace "1" -1)
@@ -1111,6 +1093,11 @@ we hook into `buffer-list-update-hook' additionally."
       (message "Killing pynt kernels...")
       (apply 'call-process (append (list "kill" nil nil nil)
                                    kernel-pids))))
+
+  ;; Delete all the notebook files.
+  (dolist (notebook-file pynt-notebook-files)
+    (message "Deleting %s..." notebook-file)
+    (delete-file notebook-file))
 
   ;; Remove code buffer from global list.
   (delete (buffer-file-name) pynt-code-buffer-file-names))

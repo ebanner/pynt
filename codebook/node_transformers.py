@@ -620,16 +620,16 @@ class Annotator(ast.NodeTransformer):
             )
         ]
 
-    def visit_While(self, whilst):
-        return [
-            Annotator.make_annotation(buffer=self.buffer, content=f'`while {astor.to_source(whilst.test).strip()} ...`', cell_type='2'),
-            Annotator.make_annotation(whilst.test, buffer=self.buffer),
-            ast.While(
-                test=whilst.test,
-                body=self._annotate_nodes(whilst.body),
-                orelse=self._annotate_nodes(whilst.orelse),
-            )
-        ]
+    # def visit_While(self, whilst):
+    #     return [
+    #         Annotator.make_annotation(buffer=self.buffer, content=f'`while {astor.to_source(whilst.test).strip()} ...`', cell_type='2'),
+    #         Annotator.make_annotation(whilst.test, buffer=self.buffer),
+    #         ast.While(
+    #             test=whilst.test,
+    #             body=self._annotate_nodes(whilst.body),
+    #             orelse=self._annotate_nodes(whilst.orelse),
+    #         )
+    #     ]
 
     def visit_Try(self, try_):
         handlers = []

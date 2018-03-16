@@ -729,9 +729,10 @@ recently started kernel.
 
 This function is meant to be used as a sentinel after the process
 pynt-embed finishes."
-  (select-window (get-buffer-window "*pynt code*"))
+  (select-window (get-buffer-window pynt-code-buffer-name))
   (pynt-log "Setting the visited file name by to %s..." pynt-code-buffer-file-name)
   (set-visited-file-name pynt-code-buffer-file-name)
+  (set-buffer-modified-p nil)           ; buffer has not been modified
 
   ;; Kill an existing kernel process if there is one.
   (pynt-log "Checking %S active kernel..." pynt-namespace)
@@ -858,11 +859,6 @@ pynt-embed to jack into the desired namespace."
     (if (string= command "ein:connect-run-or-eval-buffer")
         (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)
 
-      ;; pynt-embed will temporarily modify the underlying file. To prevent emacs
-      ;; from rendering the change in buffer change the underlying file until
-      ;; pynt-embed finishes.
-      (set-visited-file-name "*pynt code*")
-
       (set-process-sentinel
        (let* ((default-directory (pynt-project-root))
               (namespace-path (concat (pynt-project-relative-dir) pynt-namespace)))
@@ -877,6 +873,12 @@ $ %s
                          "markdown"
                          -1)
          (pynt-log "Calling pynt-embed -namespace %s -cmd %s ..." namespace-path command)
+
+         ;; pynt-embed will temporarily modify the underlying file. To prevent emacs
+         ;; from rendering the change in buffer change the underlying file until
+         ;; pynt-embed finishes.
+         (save-buffer)
+         (set-visited-file-name nil)
          (start-process "PYNT Embed"
                         "*pynt-embed*"
                         "pynt-embed"

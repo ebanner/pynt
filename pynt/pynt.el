@@ -794,11 +794,12 @@ Use the variable `pynt-project-root' first. If that is not set
 then ask magit for the closest enclosing github repo root."
   (magit-toplevel))
 
-(defun pynt-project-relative-path ()
-  "Relative path from the project root."
-  (let* ((project-path (expand-file-name (pynt-project-root)))
-         (project-relative-path (replace-regexp-in-string project-path "" (buffer-file-name))))
-    project-relative-path))
+(defun pynt-project-relative-path (&optional namespace)
+  "Relative path from the project root.
+
+If NAMESPACE is nil then just use the file name."
+  (setq non-directory-part (or namespace (file-name-nondirectory (buffer-file-name))))
+  (concat (pynt-project-relative-dir) non-directory-part))
 
 (defun pynt-project-relative-dir ()
   "Relative directory the project root."
@@ -925,9 +926,30 @@ Available commands include those in the file pynt.json whose key
 is the variable `pynt-active-namespace'."
   (interactive)
   (helm :sources
-        `((name . ,(format "Namespace *%s* jack-in commands" pynt-namespace))
-          (candidates . (,(pynt-jack-in-command)))
-          (action . pynt-jack-in))))
+        `((name . ,(format "Command to jack into %S with" pynt-namespace))
+          (candidates . ,(pynt-jack-in-commands))
+          (action . pynt-prompt-transition))))
+
+(defun pynt-prompt-transition (command)
+  (if (string= command (pynt-test-runner))
+      (when (y-or-n-p (format "Make %S testable?" pynt-namespace))
+        (pynt-add-testable command))
+    (when (y-or-n-p (format "Make %S a lazy command for %S?" command pynt-namespace))
+      (pynt-add-lazy-command command)))
+  (pynt-jack-in command))
+
+(defun pynt-jack-in-commands ()
+  "Return all jack-in commands in pynt.json."
+  (let ((all-commands (append
+                       (pynt-lazy-commands)
+                       (pynt-module-commands)
+                       (list (pynt-test-runner)
+                             "ein:connect-run-or-eval-buffer"))))
+    (delete-dups all-commands)))
+
+(defun pynt-lazy-commands ()
+  (let ((lazy-command-map (alist-get 'lazy-commands (pynt-command-map))))
+    (mapcar 'cdr lazy-command-map)))
 
 (defun pynt-jupyter-server-start ()
   "Start a jupyter notebook server.

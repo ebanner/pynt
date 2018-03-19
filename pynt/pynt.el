@@ -512,11 +512,13 @@ code into the notebook."
   "Get the command map.
 
 Read the pynt.json file in the project root."
-  (let ((json-array-type 'list))
-    (json-read-file (pynt-json-path))))
+  (when (file-exists-p (pynt-json-path))
+    (let ((json-array-type 'list))
+      (json-read-file (pynt-json-path)))))
 
 (defun pynt-json-path ()
-  (concat (pynt-project-root) "pynt.json"))
+  (let ((json-path (concat (pynt-project-root) "pynt.json")))
+    (when (file-exists-p json-path) json-path)))
 
 (defun pynt-lazy-commands ()
   (let ((lazy-command-map (alist-get 'lazy-commands (pynt-command-map))))
@@ -793,9 +795,11 @@ pynt (and EIN)."
 (defun pynt-project-root ()
   "Get the project root.
 
-Use the variable `pynt-project-root' first. If that is not set
-then ask magit for the closest enclosing github repo root."
-  (magit-toplevel))
+Ask projectile for the project root. If not in a project then
+just return the current directory."
+  (condition-case nil
+      (projectile-project-root)
+    (error (file-name-directory (buffer-file-name)))))
 
 (defun pynt-project-relative-path (&optional namespace)
   "Relative path from the project root.
@@ -837,13 +841,14 @@ Modules have a different rule than functions/methods. Modules check the "
     (let ((lazy-commands (alist-get 'lazy-commands (pynt-command-map))))
       (alist-get (intern namespace-project-relative-path) lazy-commands)))
 
-  (if (string-match-p (regexp-quote ".") namespace)
-      (cond ((lazy-command namespace) (lazy-command namespace))
-            ((or (testable-p namespace) (test-p namespace)) (pynt-test-runner))
-            (t nil))
-    (if (test-p namespace)
-        (pynt-test-runner)              ; still might be a test module
-      (car (pynt-module-commands)))))
+  (when (pynt-json-path)
+    (if (string-match-p (regexp-quote ".") namespace)
+        (cond ((lazy-command namespace) (lazy-command namespace))
+              ((or (testable-p namespace) (test-p namespace)) (pynt-test-runner))
+              (t nil))
+      (if (test-p namespace)
+          (pynt-test-runner)              ; still might be a test module
+        (car (pynt-module-commands))))))
 
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
@@ -879,8 +884,8 @@ $ %s
          ;; pynt-embed finishes.
          (save-buffer)
          (set-visited-file-name nil)
-         (start-process "PYNT Embed"
-                        "*pynt-embed*"
+         (start-process "*pynt embed*"
+                        "*pynt embed*"
                         "pynt-embed"
                         "-namespace" namespace-path
                         "-cmd" command))
@@ -929,17 +934,21 @@ for the default jack in commands identified by the identifier
 Available commands include those in the file pynt.json whose key
 is the variable `pynt-active-namespace'."
   (interactive)
-  (helm :sources
-        `((name . ,(format "Command to jack into %S with" pynt-namespace))
-          (candidates . ,(pynt-jack-in-commands))
-          (action . pynt-prompt-transition))))
+  (let ((jack-in-commands (if (pynt-json-path)
+                              (pynt-jack-in-commands)
+                            '("ein:connect-run-or-eval-buffer"))))
+    (helm :sources
+          `((name . ,(format "Command to jack into %S with" pynt-namespace))
+            (candidates . ,jack-in-commands)
+            (action . pynt-prompt-transition)))))
 
 (defun pynt-prompt-transition (command)
-  (if (string= command (pynt-test-runner))
-      (when (y-or-n-p (format "Make %S testable?" pynt-namespace))
-        (pynt-add-testable command))
-    (when (y-or-n-p (format "Make %S a lazy command for %S?" command pynt-namespace))
-      (pynt-add-lazy-command command)))
+  (when (pynt-json-path)
+    (if (string= command (pynt-test-runner))
+        (when (y-or-n-p (format "Make %S testable?" pynt-namespace))
+          (pynt-add-testable command))
+      (when (y-or-n-p (format "Make %S a lazy command for %S?" command pynt-namespace))
+        (pynt-add-lazy-command command))))
   (pynt-jack-in command))
 
 (defun pynt-jack-in-commands ()

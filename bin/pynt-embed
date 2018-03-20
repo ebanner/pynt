@@ -8,6 +8,7 @@ notebook and talk to it.
 """
 
 import ast
+import logging
 import os
 import shutil
 import subprocess
@@ -18,6 +19,9 @@ import jupyter_core
 import plac
 
 from codebook.node_transformers import IPythonEmbedder
+
+FORMAT = '\n============ %(message)s ============\n'
+logging.basicConfig(level=logging.INFO, format=FORMAT)
 
 
 @plac.annotations(
@@ -69,8 +73,9 @@ def main(namespace, cmd):
         f.write(code_)
 
     # Run `cmd`
+    logging.info(f'COMMAND = `{cmd}`')
     p = subprocess.run(cmd.split())
-    print(f'p.returncode = {p.returncode}')
+    logging.info(f'RETURN CODE = `{p.returncode}`')
 
     # Move Original File Back
     shutil.copyfile(t.name, path)

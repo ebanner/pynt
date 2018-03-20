@@ -319,7 +319,7 @@ This is done by sending the code region out to the AST server
 where it is annotated with EPC calls and then the resulting code
 is sent to the IPython kernel to be executed."
   (interactive)
-  (pynt-kill-cells)
+  (pynt-offload-to-scratch-worksheet)
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
       (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace ,t))
@@ -327,6 +327,24 @@ is sent to the IPython kernel to be executed."
         (lambda (cells)
           (dolist (cell cells)
                   (apply 'pynt-make-cell cell)))))))
+
+(defun pynt-goto-next-cell-line ()
+  (interactive)
+  (setq line-number (1+ (line-number-at-pos))
+        max-line-number (seq-max (map-keys pynt-line-to-cell-map)))
+  (while (and (< line-number max-line-number) (not (gethash line-number pynt-line-to-cell-map)))
+    (setq line-number (1+ line-number)))
+  (when (gethash line-number pynt-line-to-cell-map)
+      (goto-line line-number)))
+
+(defun pynt-goto-prev-cell-line ()
+  (interactive)
+  (setq line-number (1- (line-number-at-pos))
+        min-line-number (seq-min (map-keys pynt-line-to-cell-map)))
+  (while (and (> line-number min-line-number) (not (gethash line-number pynt-line-to-cell-map)))
+    (setq line-number (1- line-number)))
+  (when (gethash line-number pynt-line-to-cell-map)
+    (goto-line line-number)))
 
 (defun pynt-trace-namespace ()
   "Dump the code in `pynt-active-namespace' into its notebook.
@@ -1157,6 +1175,8 @@ we hook into `buffer-list-update-hook' additionally."
     (define-key map (kbd "C-c C-s") 'pynt-choose-namespace)
     (define-key map (kbd "C-c C-k") 'pynt-choose-jack-in-command)
     (define-key map (kbd "C-c C-y") 'pynt-expand-for)
+    (define-key map (kbd "C-c C-n") 'pynt-goto-next-cell-line)
+    (define-key map (kbd "C-c C-p") 'pynt-goto-prev-cell-line)
     (define-key map (kbd "<up>") 'pynt-next-cell-instance)
     (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
     map))

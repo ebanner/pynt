@@ -34,6 +34,27 @@ def upcase(s):
     u = f'{s[0].upper()}{s[1:]}'
     return u
 
+def make_annotation(node=None, buffer='outside', content=None, cell_type='code', lineno=None):
+    """Return a ast.Expr that looks like
+
+    ```
+    __cell__('make-cell', [content, buffer, cell_type])
+    ```
+
+    """
+    content = astor.to_source(node).strip() if node else content
+    lineno = str(node.lineno) if hasattr(node, 'lineno') else str(-1) if not lineno else str(lineno)
+    call = ast.Call(
+        func=ast.Name(id='__cell__', ctx=ast.Load()),
+        args=[
+            ast.Str(s=content),
+            ast.Str(s=f'{buffer}'),
+            ast.Str(s=cell_type),
+            ast.Str(s=lineno),
+        ],
+        keywords=[]
+    )
+    return ast.Expr(call)
 
 class LineNumberFinder(ast.NodeTransformer):
     """Find the function or method which is defined at a particular line number"""
@@ -296,8 +317,7 @@ class IPythonEmbedder(ast.NodeTransformer):
             node = func
         return node
 
-
-class FunctionExploder(ast.NodeTransformer):
+class NamespacePromoter(ast.NodeTransformer):
     """Takes a body of a function and pushes it into the global namespace"""
 
     def __init__(self, buffer):
@@ -311,7 +331,7 @@ class FunctionExploder(ast.NodeTransformer):
         can't have any returns. An acceptable alternative is to set a variable
         called 'RETURN' and then immediately raise an exception.
 
-        >>> self = FunctionExploder(buffer='foo')
+        >>> self = NamespacePromoter(buffer='foo')
         >>> code = '''
         ...
         ... return 5
@@ -330,7 +350,7 @@ class FunctionExploder(ast.NodeTransformer):
     def visit_FunctionDef(self, func):
         """Roll out a function definition
 
-        >>> self = FunctionExploder(buffer='bar')
+        >>> self = NamespacePromoter(buffer='bar')
         >>> code = '''
         ...
         ... x
@@ -368,7 +388,7 @@ class FunctionExploder(ast.NodeTransformer):
         # insert function name and docstring san doctests
         exprs = []
         exprs.append(
-            Annotator.make_annotation(
+            make_annotation(
                 buffer=self.buffer,
                 content=f'`{func.name}`',
                 cell_type='1',
@@ -376,7 +396,7 @@ class FunctionExploder(ast.NodeTransformer):
             )
         )
         if docstring:
-            exprs.append(Annotator.make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
+            exprs.append(make_annotation(buffer=self.buffer, content=docstring_prefix, cell_type='markdown'))
 
         # keyword (default) values
         vars, values = reversed(func.args.args), reversed(func.args.defaults)
@@ -396,36 +416,16 @@ class FunctionExploder(ast.NodeTransformer):
 
         # docstring values override keyword values
         if docstring:
-            # exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
+            # exprs.append(make_annotation(buffer=self.buffer, content='Docstring Assignments', cell_type='1'))
             for assign_expr in docstring_assigns:
                 tree = ast.parse(assign_expr)
                 exprs.append(tree.body[0])
 
         # final dump of all arguments
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Arguments', cell_type='1'))
+        exprs.append(make_annotation(buffer=self.buffer, content='Arguments', cell_type='1'))
         exprs.extend(ast.Expr(arg) for arg in func.args.args)
 
-        # # input values from previous exception
-        # exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Dump Assignments', cell_type='1'))
-        # for var in func.args.args:
-        #     assign = ast.Assign(
-        #         targets=[ast.Name(id=var.arg, ctx=ast.Store())],
-        #         value=ast.IfExp(
-        #             test=ast.Compare(
-        #                 left=ast.Str(s=var.arg),
-        #                 ops=[ast.In()],
-        #                 comparators=[ast.Name(id='__locals__', ctx=ast.Load())]
-        #             ),
-        #             body=ast.Subscript(
-        #                 value=ast.Name(id='__locals__', ctx=ast.Load()),
-        #                 slice=ast.Index(value=ast.Str(s=var.arg)),
-        #                 ctx=ast.Load()
-        #             ),
-        #             orelse=ast.Name(id=var.arg, ctx=ast.Load()))
-        #     )
-        #     exprs.append(assign)
-
-        exprs.append(Annotator.make_annotation(buffer=self.buffer, content='Body', cell_type='1'))
+        exprs.append(make_annotation(buffer=self.buffer, content='Body', cell_type='1'))
 
         return exprs + func.body
 
@@ -459,7 +459,7 @@ class FirstPassForSimple(ast.NodeTransformer):
         )
         content = f'`for {astor.to_source(loop.target).strip()} in {astor.to_source(loop.iter).strip()} ...`'
         nodes = []
-        nodes.append(Annotator.make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno))
+        nodes.append(make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno))
         nodes.append(ast.Expr(loop.iter))
         nodes.append(get_first)
         nodes.extend(loop.body)
@@ -501,7 +501,7 @@ class FirstPassFor(ast.NodeTransformer):
         )
         content = f'`for {astor.to_source(loop.target).strip()} in {astor.to_source(loop.iter).strip()} ...`'
         return [
-            Annotator.make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno),
+            make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=loop.lineno),
             ast.Expr(loop.iter),
             assign,
             first_pass
@@ -563,35 +563,53 @@ class SyntaxRewriter(ast.NodeTransformer):
         rest = RestIterableFor(self.buffer).visit(copy.deepcopy(loop))
         return first + [rest]
 
-class Annotator(ast.NodeTransformer):
-    """Annotates code with commands to create jupyter notebook cells"""
+class ShallowAnnotator(ast.NodeTransformer):
+    """Does a shallow annotation on the code given to it
 
-    @staticmethod
-    def make_annotation(node=None, buffer='outside', content=None, cell_type='code', lineno=None):
-        """Return a ast.Expr that looks like
+    Literally only do assignment rewrites.
 
-        __cell__('make-cell', [content, buffer, cell_type])
-
-        >>> content = 'x = 5'
-
-        """
-        content = astor.to_source(node).strip() if node else content
-        lineno = str(node.lineno) if hasattr(node, 'lineno') else str(-1) if not lineno else str(lineno)
-        call = ast.Call(
-            func=ast.Name(id='__cell__', ctx=ast.Load()),
-            args=[
-                ast.Str(s=content),
-                ast.Str(s=f'{buffer}'),
-                ast.Str(s=cell_type),
-                ast.Str(s=lineno),
-            ],
-            keywords=[]
-        )
-        return ast.Expr(call)
-
+    """
     def __init__(self, buffer):
         super(__class__, self).__init__()
         self.buffer = buffer
+
+    def visit_Assign(self, assign):
+        """Append the targets to the assign code string"""
+        assign_content, targets_content = astor.to_source(assign), astor.to_source(assign.targets[0])
+        content = assign_content + targets_content.strip()
+        return make_annotation(
+            buffer=self.buffer,
+            content=content,
+            lineno=assign.lineno if hasattr(assign, 'lineno') else None
+        )
+
+    def visit_Expr(self, expr):
+        """Don't double-annotate an annotation
+
+        Even in `expr` is a `ast.Call` its `value` might be a `ast.Attribute`
+        not a `ast.Name`. In this case we know it's not an annotation. Perhaps
+        a more reliable way would be traversing the AST and looking for any
+        node with a `id` of `__cell__` or perhaps tagging the node with a
+        boolean flag called `is_annotation`.
+
+        Annotations are only *maybe* here at this point because
+        `NamespacePromoter` puts them in.
+
+        """
+        if isinstance(getattr(expr, 'value', None), ast.Call) and getattr(expr.value.func, 'id', None) == '__cell__':
+            return expr
+        else:
+            return make_annotation(expr, buffer=self.buffer)
+
+    def generic_visit(self, node):
+        if isinstance(node, ast.Module):
+            return super().generic_visit(node)
+        else:
+            return make_annotation(node, buffer=self.buffer)
+
+
+class DeepAnnotator(ShallowAnnotator):
+    """Annotates code with commands to create jupyter notebook cells"""
 
     def _annotate_nodes(self, nodes):
         """Make annotation on the nodes.
@@ -611,25 +629,14 @@ class Annotator(ast.NodeTransformer):
 
     def visit_If(self, iff):
         return [
-            Annotator.make_annotation(buffer=self.buffer, content=f'`if {astor.to_source(iff.test).strip()} ...`', cell_type='2'),
-            Annotator.make_annotation(iff.test, buffer=self.buffer),
+            make_annotation(buffer=self.buffer, content=f'`if {astor.to_source(iff.test).strip()} ...`', cell_type='2'),
+            make_annotation(iff.test, buffer=self.buffer),
             ast.If(
                 test=iff.test,
                 body=self._annotate_nodes(iff.body),
                 orelse=self._annotate_nodes(iff.orelse)
             )
         ]
-
-    # def visit_While(self, whilst):
-    #     return [
-    #         Annotator.make_annotation(buffer=self.buffer, content=f'`while {astor.to_source(whilst.test).strip()} ...`', cell_type='2'),
-    #         Annotator.make_annotation(whilst.test, buffer=self.buffer),
-    #         ast.While(
-    #             test=whilst.test,
-    #             body=self._annotate_nodes(whilst.body),
-    #             orelse=self._annotate_nodes(whilst.orelse),
-    #         )
-    #     ]
 
     def visit_Try(self, try_):
         handlers = []
@@ -655,32 +662,15 @@ class Annotator(ast.NodeTransformer):
         Do the same thing as `generic_visit()` otherwise.
 
         """
-        assign_content, targets_content = astor.to_source(assign), astor.to_source(assign.targets[0])
-        content = assign_content + targets_content.strip()
-        target = astor.to_source(assign.targets[0]).strip()
-        return [
-            # Annotator.make_annotation(buffer=self.buffer, content=f'`{target} = ...`', cell_type='2'),
-            assign,
-            Annotator.make_annotation(buffer=self.buffer, content=content, lineno=assign.lineno if hasattr(assign, 'lineno') else None),
-        ]
+        annotated_assign = super().visit_Assign(assign)
+        return [assign, annotated_assign]
 
     def visit_Expr(self, expr):
-        """Don't double-annotate an annotation
-
-        Even in `expr` is a `ast.Call` its `value` might be a `ast.Attribute`
-        not a `ast.Name`. In this case we know it's not an annotation. Perhaps
-        a more reliable way would be traversing the AST and looking for any
-        node with a `id` of `__cell__` or perhaps tagging the node with a
-        boolean flag called `is_annotation`.
-
-        Annotations are only *maybe* here at this point because
-        `FunctionExploder` puts them in.
-
-        """
-        if isinstance(expr.value, ast.Call) and getattr(expr.value.func, 'id', None) == '__cell__':
+        annotated_expr = super().visit_Expr(expr)
+        if annotated_expr == expr:
             return expr
         else:
-            return [Annotator.make_annotation(expr, buffer=self.buffer), expr]
+            return [annotated_expr, expr]
 
     def generic_visit(self, node):
         """Catch-all for nodes that slip through
@@ -689,8 +679,12 @@ class Annotator(ast.NodeTransformer):
         annotator for gets caught here and wrapped in an annotation. Currently
         the one that jumps to mind are context managers.
 
+        This is necessary because some nodes we recursively call `self.visit()`
+        on and we may run into expressions that we have not written a node
+        tranformer for.
+
         """
         if isinstance(node, ast.Module):
             return super().generic_visit(node)
         else:
-            return [Annotator.make_annotation(node, buffer=self.buffer), node]
+            return [make_annotation(node, buffer=self.buffer), node]

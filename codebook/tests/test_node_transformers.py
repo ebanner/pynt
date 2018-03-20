@@ -39,3 +39,51 @@ class TestSupport(TestCase):
         output = codebook.node_transformers.upcase(s)
         expected = 'Foo'
         self.assertEqual(output, expected)
+
+class TestFilters(TestCase):
+    def test_filter_class(self):
+        code = """
+
+class Foo:
+    def bar():
+        pass
+
+class Bar:
+    def biz():
+        pass
+
+"""
+        tree = ast.parse(code)
+        out = codebook.node_transformers.ClassFinder(class_name='Foo').visit(tree)
+        c = astor.to_source(out)
+        self.assertIn('Foo', c)
+        self.assertNotIn('Bar', c)
+
+    def test_filter_function(self):
+        code = """
+
+def foo():
+    pass
+
+def bar():
+    pass
+
+"""
+        tree = ast.parse(code)
+        out = codebook.node_transformers.FunctionFinder(func_name='foo').visit(tree)
+        c = astor.to_source(out)
+        self.assertIn('foo', c)
+        self.assertNotIn('bar', c)
+
+class TestShallowAnnotator(TestCase):
+    def test_simple(self):
+        code = """
+
+a = 3
+b = a + 2
+
+"""
+        module = ast.parse(code)
+        out = codebook.node_transformers.SimpleAnnotator(buffer='foo').visit(module)
+        c = astor.to_source(out)
+        self.assertIn('__cell__', c)

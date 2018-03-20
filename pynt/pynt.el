@@ -357,9 +357,18 @@ That is don't actually run the code. Just create the cells."
         (lambda (cells)
           (with-current-buffer (pynt-notebook-buffer)
             (call-interactively 'ein:worksheet-kill-cell)
-            (call-interactively 'ein:worksheet-goto-prev-input))
+            (if (not (pynt-last-cell-p))
+                (call-interactively 'ein:worksheet-goto-prev-input)))
           (dolist (cell cells)
             (apply 'pynt-make-cell (add-to-list 'cell :at-point :append))))))))
+
+(defun pynt-last-cell-p ()
+  "Return t if you are at the last cell in a notebook."
+  (let ((start (point)))
+    (condition-case nil
+        (save-excursion
+          (call-interactively 'ein:worksheet-goto-next-input))
+      (error nil t))))
 
 (defun pynt-get-cell-at-pos ()
   "Get the cell corresponding to the current line number."

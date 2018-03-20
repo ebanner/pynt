@@ -319,12 +319,24 @@ This is done by sending the code region out to the AST server
 where it is annotated with EPC calls and then the resulting code
 is sent to the IPython kernel to be executed."
   (interactive)
+  (pynt-kill-cells)
+  (let ((code (buffer-substring-no-properties (point-min) (point-max))))
+    (deferred:$
+      (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace ,t))
+      (deferred:nextc it
+        (lambda (cells)
+          (dolist (cell cells)
+                  (apply 'pynt-make-cell cell)))))))
+
+(defun pynt-trace-namespace ()
+  "Dump the code in `pynt-active-namespace' into its notebook.
+
+Don't execute the code though. This is meant to be fast."
+  (interactive)
   (setq pynt-lock nil)
   (pynt-offload-to-scratch-worksheet)
   (let ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (pynt-log "Dumping the namespace!")
-      (pynt-log "Calling python AST server with active namespace = %s ..." pynt-namespace)
       (epc:call-deferred pynt-ast-server 'annotate `(,code ,pynt-namespace))
       (deferred:nextc it
         (lambda (annotated-code)
@@ -499,7 +511,7 @@ code into the notebook."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
-          (pynt-kill-cells)
+          (pynt-dump-namespace)
           (let ((command (pynt-jack-in-command)))
             (if command
                 (pynt-jack-in command)
@@ -748,10 +760,7 @@ pynt-embed finishes."
   (when new-kernel-pid
     (puthash pynt-namespace new-kernel-pid pynt-namespace-to-kernel-pid-map))
 
-  (pynt-make-cell (format "Jack in command %s" event)
-                  pynt-namespace
-                  "markdown"
-                  -1)
+  (pynt-embed-message (format "Jack in command %s" event))
 
   (deferred:$
     ;; Restart the kernel.
@@ -775,7 +784,7 @@ pynt-embed finishes."
     (deferred:nextc it
       (lambda (msg)
         (with-current-buffer pynt-code-buffer-name
-          (pynt-init-epc-client "pass" 'pynt-dump-namespace))))))
+          (pynt-init-epc-client "pass"))))))
 
 (defun pynt-run-all-cells-above ()
   "Execute all cells above and including the cell at point.
@@ -850,6 +859,10 @@ Modules have a different rule than functions/methods. Modules check the "
           (pynt-test-runner)              ; still might be a test module
         (car (pynt-module-commands))))))
 
+(defun pynt-embed-message (text)
+  (with-current-buffer "*pynt embed*"
+    (message text)))
+
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
 
@@ -859,24 +872,13 @@ buffer to EIN. Otherwise make a call out to the external script
 pynt-embed to jack into the desired namespace."
   (interactive)
   (when namespace (setq pynt-namespace namespace))
-  (pynt-make-cell (format "Initializing kernel for `%s`..." pynt-namespace) pynt-namespace "1" -1)
   (with-current-buffer pynt-code-buffer-name
     (if (string= command "ein:connect-run-or-eval-buffer")
-        (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace) 'pynt-dump-namespace)
+        (pynt-init-epc-client (format "__name__ = '%s'" pynt-namespace))
 
       (set-process-sentinel
        (let* ((default-directory (pynt-project-root))
               (namespace-path (concat (pynt-project-relative-dir) pynt-namespace)))
-         (pynt-make-cell (format "Jacking into namespace `%s` with the command
-
-```
-$ %s
-```
-
-..." pynt-namespace command)
-                         pynt-namespace
-                         "markdown"
-                         -1)
          (pynt-log "Calling pynt-embed -namespace %s -cmd %s ..." namespace-path command)
 
          ;; pynt-embed will temporarily modify the underlying file. To prevent emacs
@@ -889,7 +891,17 @@ $ %s
                         "pynt-embed"
                         "-namespace" namespace-path
                         "-cmd" command))
-       'pynt-switch-kernel))))
+       'pynt-switch-kernel)
+
+      (display-buffer (get-buffer-create "*pynt embed*")
+                      '((display-buffer-at-bottom)
+                        (window-height . 20)))
+
+      (with-selected-window (get-buffer-window "*pynt embed*")
+        (add-hook 'after-change-functions 'pynt-scroll-window nil :local))
+
+      (pynt-embed-message (format "Initializing kernel for `%s`..." pynt-namespace))
+      (pynt-embed-message (format "Jacking into namespace `%s` with the command %S ..." pynt-namespace command)))))
 
 (defun pynt-matching-module-patterns ()
   "Get the patterns which match this file in pynt.json.
@@ -1023,6 +1035,11 @@ exists we just switch to it."
 (defun pynt-invalidate-scroll-map (&optional a b c)
   (pynt-log "Invalidating scroll map!")
   (setq pynt-line-to-cell-map (make-hash-table :test 'equal)))
+
+(defun pynt-scroll-window (&optional a b c)
+  (with-selected-window (get-buffer-window "*pynt embed*")
+    (end-of-buffer)
+    (recenter -1)))
 
 (defun pynt-init (namespace)
   "Initialize a namespace.

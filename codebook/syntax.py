@@ -4,76 +4,115 @@ import ast
 
 import astor
 
-from codebook.node_transformers import (Annotator, FirstPassForSimple,
-                                        FunctionExploder, IPythonEmbedder,
-                                        LineNumberFinder, SyntaxRewriter)
+import codebook.node_transformers
+from codebook.node_transformers import (DeepAnnotator, FirstPassForSimple,
+                                        NamespacePromoter, IPythonEmbedder,
+                                        LineNumberFinder, ShallowAnnotator,
+                                        SyntaxRewriter)
 
+def find_func(module, namespace):
+    """Filter away everything except the function
 
-def annotate(*region):
-    """Annotate region with code to make and eval cells
+    Addionally rename the function for better readability.
 
     Args:
-        s (str): the code
-        ns (str): the namespace
+        module (ast.Module): the entire parsed code
+        namespace (str): identifier for the function of interest
 
-    `ns` is of the form
+    `namspace` will be of the form <module_name>.<function_name>
 
-
-        - <module-name>
-        - <module-name>.<func-name>
-        - <module-name>.<class-name>.<method-name>
-
-    region = [s, ns]
-
-    >>> code = '''
-    ...
-    ... x
-    ... def bar():
-    ...     pass
-    ... class Biz:
-    ...     def baz(self):
-    ...         pass
-    ... def qux():
-    ...     pass
-    ... y
-    ...
-    ... '''
-    >>>
-    >>> namespace = 'foo.bar'
-    >>> region = [code, namespace]
+    Returns:
+        module (ast.Module): the original module but with everything filtered
+        away except the function and the function with a more readable name
 
     """
-    code, namespace = region
-    tree = ast.parse(code)
+    module_name, func_name = namespace.split('.')
+    funcs = [stmt for stmt in module.body if isinstance(stmt, ast.FunctionDef)]
+    func, = [func for func in funcs if func.name == func_name]
+    func.name = f'{module_name}.{func_name}'
+    module.body = [func]
+    return module
+
+def find_method(module, namespace):
+    """Filter away everything except the method
+
+    Promote the method up to the global namespace so that it is
+    indistinguishable from a regular function.
+
+    Arguments:
+        module (ast.Module): the entire parsed source code
+        namespace (str): identifier for the method of interest
+
+    Returns:
+        module (ast.Module): the original module but with everything filtered
+        away except the method name but with the name `namespace` and promoted
+        to the global (i.e. top) level
+
+    """
+    module_name, class_name, method_name = ns_tokens
+    classdefs = [stmt for stmt in module.body if isinstance(stmt, ast.ClassDef)]
+    classdef, = [classdef for classdef in classdefs if classdef.name == class_name]
+    methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
+    for method in methods:
+        if method.name == method_name:
+            method.name = f'{module_name}.{class_name}.{method_name}'
+            module.body = [method]
+            return module
+
+def filter_away_except(tree, namespace):
+    """Filter away everything except the namespace
+
+    In the case that `namespace` is a method promote the method to the global
+    (i.e. top) level.
+
+    Arguments:
+        tree (ast.Module): the entire parsed code from the code buffer
+        namespace (str): the namespace (i.e. region of code) of interest
+
+    Returns:
+        small_tree (ast.Module): `tree` but everything filtered except the
+        namespace region
+
+    """
     ns_tokens = namespace.split('.')
-    if len(ns_tokens) == 1: # top-level
+    if len(ns_tokens) == 1: # module-level
         tree.body = [stmt for stmt in tree.body if not isinstance(stmt, ast.FunctionDef) and not isinstance(stmt, ast.ClassDef)]
-        e = Annotator.make_annotation(buffer=namespace, content=f'`{namespace}`', cell_type='1')
+        e = codebook.node_transformers.make_annotation(buffer=namespace, content=f'`{namespace}`', cell_type='1')
         tree.body.insert(0, e)
+        small_tree = tree
     elif len(ns_tokens) == 2: # function
-        module_name, func_name = ns_tokens
-        funcs = [stmt for stmt in tree.body if isinstance(stmt, ast.FunctionDef)]
-        func, = [func for func in funcs if func.name == func_name]
-        func.name = f'{module_name}.{func_name}'
-        tree.body = [func]
+        small_tree = find_func(tree, namespace)
     else: # method
         assert len(ns_tokens) == 3
-        module_name, class_name, method_name = ns_tokens
-        classdefs = [stmt for stmt in tree.body if isinstance(stmt, ast.ClassDef)]
-        classdef, = [classdef for classdef in classdefs if classdef.name == class_name]
-        methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
-        for method in methods:
-            if method.name == method_name:
-                method.name = namespace # rename method for readability
-                tree.body = [method]
-                break
+        small_tree = find_method(tree, namespace)
+    return small_tree
 
-    exploded_tree = FunctionExploder(buffer=namespace).visit(tree)
-    # rewritten_tree = SyntaxRewriter(buffer=namespace).visit(exploded_tree)
-    annotated_tree = Annotator(buffer=namespace).visit(exploded_tree)
-    new_code = astor.to_source(annotated_tree)
+def annotate(code, namespace, shallow=False):
+    """Annotate region with code to make and eval cells
 
-    return new_code
+    Arguments:
+        code (str): the code from the code buffer
+        namespace (str): the namespace identifying the code region of interest
+
+    `namespace` can take one of three forms depending on the type of code
+    region of interest:
+
+        - "<module_name>"
+        - "<module_name>.<func_name>"
+        - "<module_name>.<class_name>.<method_name>"
+
+    """
+    tree = ast.parse(code)
+    small_tree = filter_away_except(tree, namespace)
+    shallow_tree = NamespacePromoter(buffer=namespace).visit(tree)
+
+    if shallow:
+        annotations = ShallowAnnotator(namespace).visit(shallow_tree)
+        return unpack_annotations(annotations)
+    else:
+        annotations = DeepAnnotator(namespace).visit(shallow_tree)
+        new_code = astor.to_source(annotations)
+        return new_code
 
 def parse_namespaces(*region):
     """Parse namespaces out of the code
@@ -260,3 +299,26 @@ def annotate_toplevel(*region):
     tree = ast.parse(code)
     annotated_tree = Annotator(buffer=namespace).visit(tree)
     return astor.to_source(annotated_tree)
+
+def unpack_annotations(annotations):
+    """Extract the information out of a bunch of annotations
+
+    >>> code = '''
+    ...
+    ... __cell__('`foo.baz`', 'foo.baz', '1', '9')
+    ... __cell__('Arguments', 'foo.baz', '1', '-1')
+    ... __cell__('Body', 'foo.baz', '1', '-1')
+    ... __cell__('pass', 'foo.baz', 'code', '10')
+    ...
+    ... '''
+    ...
+    >>> annotations = ast.parse(code)
+
+    """
+    info = []
+    m = astor.to_source(annotations)
+    print(m)
+    for annotation in annotations.body:
+        content, namespace, cell_type, lineno = [arg.s for arg in annotation.value.args]
+        info.append([content, namespace, cell_type, int(lineno)])
+    return info

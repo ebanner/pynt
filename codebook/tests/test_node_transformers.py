@@ -33,6 +33,20 @@ for i in range(5):
         out = astor.to_source(m)
         self.assertIn('iter', out)
 
+    def test_nobreak(self):
+        code = """
+
+for i in range(5):
+    print(i)
+    break
+
+"""
+        tree = ast.parse(code)
+        m = codebook.node_transformers.FirstPassForSimple(buffer='foo').visit(tree)
+        out = astor.to_source(m)
+        self.assertNotIn('break', out)
+        self.assertIn('pass', out)
+
 class TestSupport(TestCase):
     def test_upcase(self):
         s = 'foo'
@@ -87,3 +101,20 @@ b = a + 2
         out = codebook.node_transformers.SimpleAnnotator(buffer='foo').visit(module)
         c = astor.to_source(out)
         self.assertIn('__cell__', c)
+
+class TestExpressionFinder(TestCase):
+    def test_simple(self):
+        code = """
+
+a
+b
+c
+
+"""
+        module = ast.parse(code)
+        out = codebook.node_transformers.ExpressionFinder(lineno=4).visit(module)
+        self.assertIsInstance(out, ast.Module)
+        c = astor.to_source(out)
+        self.assertIn('b', c)
+        self.assertNotIn('a', c)
+        self.assertNotIn('c', c)

@@ -344,27 +344,22 @@ Don't execute the code though. This is meant to be fast."
           (pynt-log "Annotated code = %s" annotated-code)
           (ein:shared-output-eval-string annotated-code))))))
 
-(defun pynt-rewrite-for ()
+(defun pynt-expand-for ()
   "Delete the corresponding for loop and unroll it once.
 
 TODO do a pure tranformation from code to cell command creation.
 That is don't actually run the code. Just create the cells."
-  (let* ((cell (pynt-get-cell-at-pos))
-         (for-loop (pynt-get-cell-contents cell)))
-    (with-current-buffer (pynt-notebook-buffer)
-      (ein:cell-goto cell)
-      (call-interactively 'ein:worksheet-kill-cell))
-    (pynt-log "for-loop = %S" for-loop)
+  (interactive)
+  (let* ((code (buffer-substring-no-properties (point-min) (point-max))))
     (deferred:$
-      (epc:call-deferred pynt-ast-server 'promote_loop `(,for-loop ,pynt-namespace))
+      (epc:call-deferred pynt-ast-server 'expand_loop `(,code ,pynt-namespace ,(line-number-at-pos)))
       (deferred:nextc it
-        (lambda (unrolled-for)
-          (epc:call-deferred pynt-ast-server 'annotate_toplevel `(,unrolled-for ,pynt-namespace))
-          (deferred:nextc it
-            (lambda (annotated-code)
-              (pynt-log "Annotated code = %s" annotated-code)
-              (ein:shared-output-eval-string annotated-code)))
-          (foo unrolled-for))))))
+        (lambda (cells)
+          (with-current-buffer (pynt-notebook-buffer)
+            (call-interactively 'ein:worksheet-kill-cell)
+            (call-interactively 'ein:worksheet-goto-prev-input))
+          (dolist (cell cells)
+            (apply 'pynt-make-cell (add-to-list 'cell :at-point :append))))))))
 
 (defun pynt-get-cell-at-pos ()
   "Get the cell corresponding to the current line number."
@@ -515,10 +510,8 @@ code into the notebook."
           (let ((command (pynt-jack-in-command)))
             (if command
                 (pynt-jack-in command)
-              (pynt-make-cell (format "No jack-in command for the namespace `%s`..." pynt-namespace) pynt-namespace "1" -1)
-              (pynt-make-cell
-               "In order to create a jack-in command then press
-`C-c C-k` to select a jack-in command." pynt-namespace "markdown" -1))))))))
+              (pynt-embed-message (format "No jack-in command for the namespace `%s`..." pynt-namespace))
+              (pynt-embed-message "In order to create a jack-in command then press `C-c C-k` to select a jack-in command."))))))))
 
 (defun pynt-command-map ()
   "Get the command map.
@@ -627,7 +620,8 @@ file in ~/Library/Jupyter/runtime/."
                (epc:define-method mngr 'python-exception 'handle-python-exception)))))
       (setq pynt-epc-server (epcs:server-start connect-function pynt-epc-port)))))
 
-(defun pynt-make-cell (expr namespace cell-type line-number)
+
+(defun pynt-make-cell (expr namespace cell-type line-number &optional at-point)
   "Make a new EIN cell and evaluate it.
 
 Insert a new code cell with contents EXPR into the worksheet
@@ -647,14 +641,17 @@ have to take special care to not access it while we're over in
 the worksheet buffer. Instead we save the variable we wish to
 append to `pynt-line-to-cell-map' into a temporary variable and
 then add it to `pynt-line-to-cell-map' when we're back in the
-code buffer."
+code buffer.
+
+If AT-POINT is t then insert the cell at the point."
   (pynt-log "(pytn-make-cell %S %S %S %S)..." expr namespace cell-type line-number)
 
   ;; These variables are buffer local so we need to grab them before switching
   ;; over to the worksheet buffer.
   (setq new-cell nil)                   ; new cell to be added
   (with-current-buffer (pynt-notebook-buffer)
-    (end-of-buffer)
+    (when (not at-point)
+      (end-of-buffer))
     (call-interactively 'ein:worksheet-insert-cell-below)
     (insert expr)
     (let ((cell (ein:get-cell-at-point))
@@ -663,8 +660,9 @@ code buffer."
             ((string= cell-type "markdown") (ein:worksheet-change-cell-type ws cell "markdown"))
             (t (ein:worksheet-change-cell-type ws cell "heading" (string-to-number cell-type))))
       (setq new-cell cell)))
-  (with-selected-window (pynt-notebook-window)
-    (beginning-of-buffer))
+  (when (not at-point)
+    (with-selected-window (pynt-notebook-window)
+      (beginning-of-buffer)))
   (when (not (eq line-number -1))
     (let ((previous-entries (gethash line-number pynt-line-to-cell-map))
           (new-entry (list namespace new-cell)))
@@ -760,7 +758,7 @@ pynt-embed finishes."
   (when new-kernel-pid
     (puthash pynt-namespace new-kernel-pid pynt-namespace-to-kernel-pid-map))
 
-  (pynt-embed-message (format "Jack in command %s" event))
+  (pynt-embed-message (format "Notebook for namespace `%s` is ready for evaluation!" pynt-namespace))
 
   (deferred:$
     ;; Restart the kernel.
@@ -860,8 +858,21 @@ Modules have a different rule than functions/methods. Modules check the "
         (car (pynt-module-commands))))))
 
 (defun pynt-embed-message (text)
-  (with-current-buffer "*pynt embed*"
-    (message text)))
+  (with-selected-window (pynt-embed-window)
+    (insert (format "%s\n" text))))
+
+(defun pynt-embed-window ()
+  (if (get-buffer-window "*pynt embed*")
+      (get-buffer-window "*pynt embed*")
+    (let ((embed-window (split-window
+                         (frame-root-window) ; window
+                         (let* ((win (and (frame-root-window)))
+                                (size (window-height win)))
+                           (round (* size (/ (- 100 30) 100.0))))
+                         'below)))
+      (with-selected-window embed-window
+        (switch-to-buffer (get-buffer-create "*pynt embed*"))
+        embed-window))))
 
 (defun pynt-jack-in (command &optional namespace)
   "Jack into the current namespace via a command.
@@ -895,14 +906,7 @@ pynt-embed to jack into the desired namespace."
 
       ;; Make *pynt embed* occupy 30 percent of the window and no more. Code
       ;; stolen from the function `shell-pop-split-window'.
-      (with-selected-window
-          (or (get-buffer-window "*pynt embed*")
-              (split-window
-               (frame-root-window) ; window
-               (let* ((win (and (frame-root-window)))
-                      (size (window-height win)))
-                 (round (* size (/ (- 100 30) 100.0))))
-               'below))
+      (with-selected-window (pynt-embed-window)
           (switch-to-buffer "*pynt embed*")
         (add-hook 'after-change-functions 'pynt-scroll-window nil :local))
 
@@ -1114,11 +1118,12 @@ we hook into `buffer-list-update-hook' additionally."
   ;; Remove notebook. Sometimes this fails when invoked via the
   ;; `kill-emacs-hook'. Leave it to EIN clean up the notebooks in that case.
   (condition-case nil
-      (when (pynt-notebook-window)
-        (delete-window (pynt-notebook-window)))
-      (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
-        (with-current-buffer (pynt-notebook-buffer namespace)
-          (call-interactively 'ein:notebook-kill-kernel-then-close-command)))
+      (progn
+        (when (pynt-notebook-window)
+          (delete-window (pynt-notebook-window)))
+        (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
+          (with-current-buffer (pynt-notebook-buffer namespace)
+            (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
     (error nil))
 
   ;; Kill dangling kernel processes.
@@ -1130,8 +1135,8 @@ we hook into `buffer-list-update-hook' additionally."
 
   ;; Delete all the notebook files.
   (dolist (notebook-file pynt-notebook-files)
-    (message "Deleting %s..." notebook-file)
     (delete-file notebook-file))
+  (message (format "Deleted %s" pynt-notebook-files))
 
   ;; Remove code buffer from global list.
   (delete (buffer-file-name) pynt-code-buffer-file-names))
@@ -1142,6 +1147,7 @@ we hook into `buffer-list-update-hook' additionally."
     (define-key map (kbd "C-c C-w") 'pynt-recover-notebook-window)
     (define-key map (kbd "C-c C-s") 'pynt-choose-namespace)
     (define-key map (kbd "C-c C-k") 'pynt-choose-jack-in-command)
+    (define-key map (kbd "C-c C-y") 'pynt-expand-for)
     (define-key map (kbd "<up>") 'pynt-next-cell-instance)
     (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
     map))

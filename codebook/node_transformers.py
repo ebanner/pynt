@@ -56,14 +56,49 @@ def make_annotation(node=None, buffer='outside', content=None, cell_type='code',
     )
     return ast.Expr(call)
 
-class LineNumberFinder(ast.NodeTransformer):
+class ExpressionFinder(ast.NodeTransformer):
+    """Find the expression which contains the line number"""
+
+    def __init__(self, lineno):
+        super(__class__, self).__init__()
+        self.lineno = lineno
+
+    def visit_Module(self, module):
+        """Search the module's top-level expressions
+
+        >>> self = ExpressionFinder(lineno=4)
+        >>> code = '''
+        ...
+        ... a
+        ... b
+        ... c
+        ...
+        ... '''
+        >>>
+        >>> module = ast.parse(code)
+
+        """
+        for i, expr in enumerate(module.body):
+            if getattr(expr, 'lineno', -float('inf')) < self.lineno:
+                continue
+            elif expr.lineno == self.lineno:
+                module.body = [expr]
+            else:
+                assert expr.lineno > self.lineno
+                module.body = module.body[i-1:i]
+            break
+        else:
+            module.body = module.body[-1:]
+        return module
+
+class DefunFinder(ast.NodeTransformer):
     """Find the function or method which is defined at a particular line number"""
 
     def __init__(self, func_name, lineno):
         """
 
-        >>> self = LineNumberFinder.__new__(LineNumberFinder)
-        >>> __class__ = LineNumberFinder
+        >>> self = DefunFinder.__new__(DefunFinder)
+        >>> __class__ = DefunFinder
         >>> func_name = 'bar'
         >>> lineno = 5
 
@@ -75,7 +110,7 @@ class LineNumberFinder(ast.NodeTransformer):
     def visit_ClassDef(self, classdef):
         """Check the line number of each of the methods
 
-        >>> self = LineNumberFinder(func_name='bar', lineno=4)
+        >>> self = DefunFinder(func_name='bar', lineno=4)
         >>> code = '''
         ...
         ... class Foo:
@@ -101,7 +136,7 @@ class LineNumberFinder(ast.NodeTransformer):
     def visit_FunctionDef(self, func):
         """Embed a `IPython.embed_kernel()` call into the function
 
-        >>> self = LineNumberFinder(func_name='bar', lineno=4)
+        >>> self = DefunFinder(func_name='bar', lineno=4)
         >>> code = '''
         ...
         ... class Foo:
@@ -432,6 +467,28 @@ class NamespacePromoter(ast.NodeTransformer):
 class FirstPassForSimple(ast.NodeTransformer):
     def __init__(self, buffer):
         self.buffer = buffer
+
+    def visit_Continue(self, cont):
+        """
+
+        >>> self = FirstPassForSimple('foo')
+        >>> code = 'continue'
+        >>> module = ast.parse(code)
+        >>> cont, = module.body
+
+        """
+        return ast.Pass()
+
+    def visit_Break(self, broken):
+        """
+
+        >>> self = FirstPassForSimple('foo')
+        >>> code = 'break'
+        >>> module = ast.parse(code)
+        >>> broken, = module.body
+
+        """
+        return ast.Pass()
 
     def visit_For(self, loop):
         """Pure syntax rewrite of a for loop

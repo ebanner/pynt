@@ -5,10 +5,11 @@ import ast
 import astor
 
 import codebook.node_transformers
-from codebook.node_transformers import (DeepAnnotator, FirstPassForSimple,
-                                        NamespacePromoter, IPythonEmbedder,
-                                        LineNumberFinder, ShallowAnnotator,
-                                        SyntaxRewriter)
+from codebook.node_transformers import (DeepAnnotator, DefunFinder,
+                                        ExpressionFinder, FirstPassForSimple,
+                                        IPythonEmbedder, NamespacePromoter,
+                                        ShallowAnnotator, SyntaxRewriter)
+
 
 def find_func(module, namespace):
     """Filter away everything except the function
@@ -49,7 +50,7 @@ def find_method(module, namespace):
         to the global (i.e. top) level
 
     """
-    module_name, class_name, method_name = ns_tokens
+    module_name, class_name, method_name = namespace.split('.')
     classdefs = [stmt for stmt in module.body if isinstance(stmt, ast.ClassDef)]
     classdef, = [classdef for classdef in classdefs if classdef.name == class_name]
     methods = [stmt for stmt in classdef.body if isinstance(stmt, ast.FunctionDef)]
@@ -257,7 +258,7 @@ def find_namespace(code, func_name, lineno):
     """
     namespace = None
     try:
-        LineNumberFinder(func_name, lineno).visit(tree)
+        DefunFinder(func_name, lineno).visit(tree)
     except Exception as e:
         namespace, = e.args
     return namespace
@@ -322,3 +323,26 @@ def unpack_annotations(annotations):
         content, namespace, cell_type, lineno = [arg.s for arg in annotation.value.args]
         info.append([content, namespace, cell_type, int(lineno)])
     return info
+
+def expand_loop(code, namespace, lineno):
+    """Extract the information out of a bunch of annotations
+
+    >>> code = '''
+    ...
+    ... for i in range(5):
+    ...     print(i)
+    ...
+    ... '''
+    >>>
+    >>> namespace = 'foo'
+    >>> lineno = 4
+
+    """
+    tree = ast.parse(code)
+    small_tree = filter_away_except(tree, namespace)
+    shallow_tree = NamespacePromoter(buffer=namespace).visit(tree)
+    small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
+    unrolled_for = FirstPassForSimple(namespace).visit(small_shallow_tree)
+    annotations = ShallowAnnotator(namespace).visit(unrolled_for)
+    return unpack_annotations(annotations)
+

@@ -893,11 +893,17 @@ pynt-embed to jack into the desired namespace."
                         "-cmd" command))
        'pynt-switch-kernel)
 
-      (display-buffer (get-buffer-create "*pynt embed*")
-                      '((display-buffer-at-bottom)
-                        (window-height . 20)))
-
-      (with-selected-window (get-buffer-window "*pynt embed*")
+      ;; Make *pynt embed* occupy 30 percent of the window and no more. Code
+      ;; stolen from the function `shell-pop-split-window'.
+      (with-selected-window
+          (or (get-buffer-window "*pynt embed*")
+              (split-window
+               (frame-root-window) ; window
+               (let* ((win (and (frame-root-window)))
+                      (size (window-height win)))
+                 (round (* size (/ (- 100 30) 100.0))))
+               'below))
+          (switch-to-buffer "*pynt embed*")
         (add-hook 'after-change-functions 'pynt-scroll-window nil :local))
 
       (pynt-embed-message (format "Initializing kernel for `%s`..." pynt-namespace))

@@ -26,14 +26,12 @@ logging.basicConfig(level=logging.INFO, format=FORMAT)
 
 @plac.annotations(
         namespace=('function to embed a kernel in', 'option', None, str),
-        cmd=('command which invokes the function', 'option', None, str),
 )
-def main(namespace, cmd):
+def main(namespace):
     """Embed a kernel in `fname` in `namespace`
 
     Args:
         namespace (str): function to embed a kernel in
-        cmd (str): command which invokes `namespace`
 
     Returns:
         None
@@ -46,7 +44,6 @@ def main(namespace, cmd):
         - my_module.MyClass.my_func
 
     >>> namespace = 'biz.bar'
-    >>> cmd = 'python example/biz.py'
 
     """
     # Compute path to file
@@ -72,18 +69,10 @@ def main(namespace, cmd):
     with open(path, 'w') as f:
         f.write(code_)
 
-    # Run `cmd`
-    logging.info(f'COMMAND = `{cmd}`')
-    p = subprocess.run(cmd.split())
-    logging.info(f'RETURN CODE = `{p.returncode}`')
-
-    # Move Original File Back
-    shutil.copyfile(t.name, path)
-
     # Write .pynt to runtime dir so a kernel (re)start will attach to this
     # kernel
-    runtime_dir = jupyter_core.paths.jupyter_runtime_dir()
-    open(f'{runtime_dir}/.pynt', 'a').close()
+    # runtime_dir = jupyter_core.paths.jupyter_runtime_dir()
+    # open(f'{runtime_dir}/.pynt', 'a').close()
 
 
 if __name__ == '__main__':

@@ -212,53 +212,10 @@ class IPythonEmbedder(ast.NodeTransformer):
         This is a purely functional method which always return the same thing.
 
         """
-        nodes = [
-            ast.Import(names=[ast.alias(name='os', asname=None)]),
-            ast.Try(
-                body=[
-                    ast.Assign(
-                        targets=[ast.Name(id='pid', ctx=ast.Store())],
-                        value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])),
-                ],
-                handlers=[
-                    ast.ExceptHandler(
-                        type=ast.Name(id='OSError', ctx=ast.Load()),
-                        name=None,
-                        body=[
-                            ast.Expr(
-                                value=ast.Call(
-                                    func=ast.Name(id='exit', ctx=ast.Load()),
-                                    args=[ast.Num(n=1)],
-                                    keywords=[]
-                                )
-                            ),
-                        ]
-                    ),
-                ],
-                orelse=[],
-                finalbody=[]
-            ),
-            ast.If(
-                test=ast.Compare(
-                    left=ast.Name(id='pid', ctx=ast.Load()),
-                    ops=[ast.Gt()],
-                    comparators=[ast.Num(n=0)]
-                ),
-                body=[
-                    ast.Import(names=[ast.alias(name='time', asname=None)]),
-                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1)], keywords=[])),
-                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='_exit', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[]))
-                ],
-                orelse=[]
-            ),
-            # ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='chdir', ctx=ast.Load()), args=[ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='getcwd', ctx=ast.Load()), args=[], keywords=[]),], keywords=[])),
-            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='setsid', ctx=ast.Load()), args=[], keywords=[])),
-            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='umask', ctx=ast.Load()), args=[ast.Num(n=0)], keywords=[])),
-            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Call(func=ast.Name(id='open', ctx=ast.Load()), args=[ast.JoinedStr(values=[ast.FormattedValue(value=ast.Subscript(value=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='environ', ctx=ast.Load()), slice=ast.Index(value=ast.Str(s='HOME')), ctx=ast.Load()), conversion=-1, format_spec=None), ast.Str(s='/.pynt'),]), ast.Str(s='w'),], keywords=[]), attr='write', ctx=ast.Load()), args=[ast.Call(func=ast.Name(id='str', ctx=ast.Load()), args=[ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='getpid', ctx=ast.Load()), args=[], keywords=[]),], keywords=[]),], keywords=[])),
+        return [
             ast.Import(names=[ast.alias(name='IPython', asname=None)]),
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
         ]
-        return nodes
 
     def visit_Module(self, module):
         """Maybe replace the entire module with a kernel

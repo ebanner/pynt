@@ -195,16 +195,11 @@ class IPythonEmbedder(ast.NodeTransformer):
 
             ```
             import os
-            try:
-                pid = os.fork()
-            except OSError:
-                exit(1)
-            if pid > 0:
+            if os.fork() > 0:
                 import time
                 time.sleep(1)
                 os._exit(0)
-            os.setsid()
-            os.umask(0)
+            open(f'{os.environ["HOME"]}/.pynt', 'a').close()
             import IPython
             IPython.start_kernel(user_ns={**locals(), **globals(), **vars()})
             ```
@@ -213,8 +208,19 @@ class IPythonEmbedder(ast.NodeTransformer):
 
         """
         return [
-            ast.Import(names=[ast.alias(name='IPython', asname=None)]),
-            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),]))]))
+            ast.Import(names=[ast.alias(name='os', asname=None),]),
+            ast.If(
+                test=ast.Compare(left=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[]), ops=[ast.Gt(),], comparators=[ast.Num(n=0),]),
+                body=[
+                    ast.Import(names=[ast.alias(name='time', asname=None),]),
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='time', ctx=ast.Load()), attr='sleep', ctx=ast.Load()), args=[ast.Num(n=1),], keywords=[])),
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='_exit', ctx=ast.Load()), args=[ast.Num(n=0),], keywords=[])),
+                ],
+                orelse=[]
+            ),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Call(func=ast.Name(id='open', ctx=ast.Load()), args=[ast.JoinedStr(values=[ast.FormattedValue(value=ast.Subscript(value=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='environ', ctx=ast.Load()), slice=ast.Index(value=ast.Str(s='HOME')), ctx=ast.Load()), conversion=-1, format_spec=None), ast.Str(s='/.pynt'),]), ast.Str(s='a'),], keywords=[]), attr='close', ctx=ast.Load()), args=[], keywords=[])),
+            ast.Import(names=[ast.alias(name='IPython', asname=None),]),
+            ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[ast.keyword(arg='user_ns', value=ast.Dict(keys=[None, None, None,], values=[ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]), ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),])),])),
         ]
 
     def visit_Module(self, module):

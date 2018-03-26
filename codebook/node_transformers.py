@@ -208,31 +208,32 @@ class IPythonEmbedder(ast.NodeTransformer):
 
         """
         return [
-            ast.Import(names=[
-                ast.alias(name='os', asname=None),
-            ]),
-            ast.If(test=ast.UnaryOp(op=ast.Not(), operand=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])), body=[
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Call(func=ast.Name(id='open', ctx=ast.Load()), args=[
-                    ast.JoinedStr(values=[
-                        ast.FormattedValue(value=ast.Subscript(value=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='environ', ctx=ast.Load()), slice=ast.Index(value=ast.Str(s='HOME')), ctx=ast.Load()), conversion=-1, format_spec=None),
-                        ast.Str(s='/.pynt'),
+            ast.Import(names=[ast.alias(name='os', asname=None),]),
+            ast.Assign(targets=[ast.Name(id='pid', ctx=ast.Store()),], value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='fork', ctx=ast.Load()), args=[], keywords=[])),
+            ast.If(
+                test=ast.Compare(left=ast.Name(id='pid', ctx=ast.Load()), ops=[ast.Eq(),], comparators=[ast.Num(n=0),]),
+                body=[
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Call(func=ast.Name(id='open', ctx=ast.Load()), args=[
+                        ast.JoinedStr(values=[
+                            ast.FormattedValue(value=ast.Subscript(value=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='environ', ctx=ast.Load()), slice=ast.Index(value=ast.Str(s='HOME')), ctx=ast.Load()), conversion=-1, format_spec=None),
+                            ast.Str(s='/.pynt'),
+                        ]),
+                        ast.Str(s='a'),
+                    ], keywords=[]), attr='close', ctx=ast.Load()), args=[], keywords=[])),
+                    ast.Import(names=[
+                        ast.alias(name='IPython', asname=None),
                     ]),
-                    ast.Str(s='a'),
-                ], keywords=[]), attr='close', ctx=ast.Load()), args=[], keywords=[])),
-                ast.Import(names=[
-                    ast.alias(name='IPython', asname=None),
-                ]),
-                ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[
-                    ast.keyword(arg='user_ns', value=ast.Dict(keys=[
-                        None,
-                        None,
-                        None,
-                    ], values=[
-                        ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]),
-                        ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]),
-                        ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),
+                    ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='IPython', ctx=ast.Load()), attr='start_kernel', ctx=ast.Load()), args=[], keywords=[
+                        ast.keyword(arg='user_ns', value=ast.Dict(keys=[
+                            None,
+                            None,
+                            None,
+                        ], values=[
+                            ast.Call(func=ast.Name(id='locals', ctx=ast.Load()), args=[], keywords=[]),
+                            ast.Call(func=ast.Name(id='globals', ctx=ast.Load()), args=[], keywords=[]),
+                            ast.Call(func=ast.Name(id='vars', ctx=ast.Load()), args=[], keywords=[]),
+                        ])),
                     ])),
-                ])),
             ], orelse=[]),
             ast.Expr(value=ast.Call(func=ast.Attribute(value=ast.Name(id='os', ctx=ast.Load()), attr='waitpid', ctx=ast.Load()), args=[
                 ast.Name(id='pid', ctx=ast.Load()),

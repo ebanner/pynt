@@ -69,14 +69,10 @@ The jupyter server listens on the port defined by the variable
 %%matplotlib inline
 
 import time
-import traceback
 import IPython
-from epc.client import EPCClient
-from IPython.core.ultratb import AutoFormattedTB
-import ast
-import inspect
+import epc.client
 
-epc_client = EPCClient(('%s', %s), log_traceback=True)
+epc_client = epc.client.EPCClient(('%s', %s), log_traceback=True)
 def __cell__(content, buffer_name, cell_type, line_number):
     epc_client.call_sync('make-cell', args=[content, buffer_name, cell_type, line_number])
     time.sleep(0.01)
@@ -99,6 +95,8 @@ There only ever needs to be one EPC server, even across multiple
 pynt mode instances.")
 
 (defvar pynt-ast-server nil "Python AST server")
+
+(defvar-local pynt-code-buffer-file-name nil "The name of the file being visited.")
 
 (defvar-local pynt-namespace nil "The name current namespace.")
 
@@ -396,7 +394,9 @@ maybe do this for all the namespaces in the beginning!"
     (with-current-buffer (pynt-notebook-buffer)
       (ein:notebook-worksheet-insert-next ein:%notebook% ein:%worksheet% :render nil))
 
-    (pynt-dump-namespace)))
+    (pynt-dump-namespace)
+
+    (pynt-connect-to-notebook-buffer (pynt-notebook-buffer))))
 
 (defun pynt-new-notebook (&optional pop-up-notebook)
   "Create a new EIN notebook and bring it up side-by-side.
@@ -414,7 +414,7 @@ relied on remember!"
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (setq pynt-pop-up-notebook pop-up-notebook)
-        (ein:notebooklist-new-notebook url-or-port nil nb-dir 'pynt-setup-notebook)))))
+        (ein:notebooklist-new-notebook url-or-port "python3" nb-dir 'pynt-setup-notebook)))))
 
 (defun pynt-start-epc-server ()
   "Start the EPC server and register its associated handlers.
@@ -583,7 +583,7 @@ IPython kernels."
   (let* ((server-cmd-path ein:jupyter-default-server-command)
          (notebook-directory (expand-file-name "~"))
          (extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
-                        "--Session.key=b''"))
+                        "--Session.key=b'\"\"'"))
          (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
     (ein:jupyter-server-start server-cmd-path notebook-directory)))
 
@@ -594,7 +594,8 @@ IPython kernels."
         (apply f args)
       (write-file pynt-code-buffer-file-name)
       (apply f args)
-      (pynt-detach-from-underlying-file))))
+      (when pynt-namespace
+        (pynt-detach-from-underlying-file)))))
 
 (defun pynt-switch-to-namespace (namespace)
   "Switch to NAMESPACE.
@@ -673,31 +674,45 @@ This involves creating a notebook if we haven't created one yet."
   "Deactivate pynt mode."
 
   ;; Remove hooks.
-  (advice-remove #'ein:connect-to-notebook-buffer #'pynt-intercept-ein-notebook-name)
+  (advice-remove 'ein:connect-to-notebook-buffer 'pynt-intercept-ein-notebook-name)
   (remove-hook 'after-change-functions 'pynt-invalidate-scroll-map :local)
   (remove-hook 'post-command-hook #'pynt-scroll-cell-window :local)
-  (remove-hook 'kill-emacs-hook 'pynt-mode-deactivate :local)
   (advice-remove 'save-buffer 'pynt-reattach-save-detach)
 
-  ;; Remove notebook. Sometimes this fails when invoked via the
-  ;; `kill-emacs-hook'. Leave it to EIN clean up the notebooks in that case.
+  ;; I suspect the call to the function
+  ;; `ein:notebook-kill-kernel-then-close-command' pops us into another buffer
+  ;; unexpectedly. Save the code buffer here and force each command to execute
+  ;; from within the code buffer.
+  (setq code-buffer (current-buffer))
+
+  ;; Delete notebook window.
   (condition-case nil
-      (progn
+      (with-current-buffer code-buffer
         (when (pynt-notebook-window)
-          (delete-window (pynt-notebook-window)))
+          (delete-window (pynt-notebook-window))))
+    (error ni))
+
+  ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
+  ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
+  ;; may be only when the notebook is deemed "modified" by EIN (or not). In any
+  ;; event do our best to clean up.
+  (condition-case nil
+      (with-current-buffer code-buffer
         (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
           (with-current-buffer (pynt-notebook-buffer namespace)
             (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
     (error nil))
 
   ;; Reattach to underlying file and save to disk.
-  (write-file pynt-code-buffer-file-name)
-  (save-buffer)
+  (with-current-buffer code-buffer
+    (write-file pynt-code-buffer-file-name)
+    (save-buffer))
 
   ;; Delete all the notebook files.
-  (dolist (notebook-file pynt-notebook-files)
-    (delete-file notebook-file))
-  (message (format "Deleted %s" pynt-notebook-files)))
+  (with-current-buffer code-buffer
+    (dolist (notebook-file pynt-notebook-files)
+      (delete-file notebook-file))
+    (message (format "Deleted %s" pynt-notebook-files))))
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))
@@ -735,9 +750,7 @@ This involves creating a notebook if we haven't created one yet."
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
         (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
         (add-hook 'kill-emacs-hook 'pynt-mode-deactivate nil :local)
-        (advice-add 'save-buffer :around 'pynt-reattach-save-detach)
-
-        (pynt-init (pynt-module-name)))
+        (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
     (pynt-mode-deactivate)))
 

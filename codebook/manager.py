@@ -68,9 +68,10 @@ class ExternalIPythonKernelManager(MappingKernelManager):
         connection_fname = f'{self.connection_dir}/kernel-{kid}.json'
         self.log.info(f'Latest kernel = {connection_fname} from dir = {self.connection_dir}')
         kernel.load_connection_file(connection_fname)
+        os.remove(f'{os.environ["HOME"]}/.pynt')
 
     def _should_use_existing(self):
-        return os.path.isfile(f'{self.connection_dir}/.pynt')
+        return os.path.isfile(f'{os.environ["HOME"]}/.pynt')
 
     @gen.coroutine
     def start_kernel(self, **kwargs):
@@ -89,7 +90,8 @@ class ExternalIPythonKernelManager(MappingKernelManager):
 
         """
         kernel_id = super(ExternalIPythonKernelManager, self).start_kernel(**kwargs).result()
-        self._attach_to_latest_kernel(kernel_id)
+        if self._should_use_existing():
+            self._attach_to_latest_kernel(kernel_id)
         raise gen.Return(kernel_id)
 
     def restart_kernel(self, kernel_id):
@@ -116,7 +118,8 @@ class ExternalIPythonKernelManager(MappingKernelManager):
                 channel.close()
             loop.remove_timeout(timeout)
             kernel.remove_restart_callback(on_restart_failed, 'dead')
-            self._attach_to_latest_kernel(kernel_id)
+            if self._should_use_existing():
+                self._attach_to_latest_kernel(kernel_id)
 
         def on_reply(msg):
             self.log.debug("Kernel info reply received: %s", kernel_id)

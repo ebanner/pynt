@@ -670,27 +670,26 @@ This involves creating a notebook if we haven't created one yet."
   ;; Create new notebook.
   (pynt-new-notebook pop-up))
 
-(defun pynt-mode-deactivate ()
+(defun pynt-mode-deactivate (&optional buffer)
   "Deactivate pynt mode."
 
   ;; Remove hooks.
   (advice-remove 'ein:connect-to-notebook-buffer 'pynt-intercept-ein-notebook-name)
   (remove-hook 'after-change-functions 'pynt-invalidate-scroll-map :local)
-  (remove-hook 'post-command-hook #'pynt-scroll-cell-window :local)
-  (advice-remove 'save-buffer 'pynt-reattach-save-detach)
+  (remove-hook 'post-command-hook 'pynt-scroll-cell-window :local)
 
   ;; I suspect the call to the function
   ;; `ein:notebook-kill-kernel-then-close-command' pops us into another buffer
   ;; unexpectedly. Save the code buffer here and force each command to execute
   ;; from within the code buffer.
-  (setq code-buffer (current-buffer))
+  (setq code-buffer (or buffer (current-buffer)))
 
   ;; Delete notebook window.
   (condition-case nil
       (with-current-buffer code-buffer
         (when (pynt-notebook-window)
           (delete-window (pynt-notebook-window))))
-    (error ni))
+    (error nil))
 
   ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
   ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
@@ -703,10 +702,14 @@ This involves creating a notebook if we haven't created one yet."
             (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
     (error nil))
 
-  ;; Reattach to underlying file and save to disk.
+  ;; Reattach to underlying file and save to disk. Save the file for real. Don't
+  ;; detach from it. But also don't disable this for other buffers using pynt
+  ;; mode.
   (with-current-buffer code-buffer
     (write-file pynt-code-buffer-file-name)
-    (save-buffer))
+    (advice-remove 'save-buffer 'pynt-reattach-save-detach)
+    (save-buffer)
+    (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
   ;; Delete all the notebook files.
   (with-current-buffer code-buffer
@@ -749,7 +752,7 @@ This involves creating a notebook if we haven't created one yet."
         ;; Hooks.
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
         (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
-        (add-hook 'kill-emacs-hook 'pynt-mode-deactivate nil :local)
+        (add-hook 'kill-emacs-hook (apply-partially 'pynt-mode-deactivate (current-buffer)))
         (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
     (pynt-mode-deactivate)))

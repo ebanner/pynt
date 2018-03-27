@@ -684,38 +684,43 @@ This involves creating a notebook if we haven't created one yet."
   ;; from within the code buffer.
   (setq code-buffer (or buffer (current-buffer)))
 
-  ;; Delete notebook window.
-  (condition-case nil
-      (with-current-buffer code-buffer
-        (when (pynt-notebook-window)
-          (delete-window (pynt-notebook-window))))
-    (error nil))
+  ;; pynt mode may have already been deactivated and we are run by
+  ;; `kill-emacs-hook'. In that case `code-buffer' is nil because it doesn't
+  ;; exist anymore and we exit.
+  (when (buffer-live-p code-buffer)
 
-  ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
-  ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
-  ;; may be only when the notebook is deemed "modified" by EIN (or not). In any
-  ;; event do our best to clean up.
-  (condition-case nil
-      (with-current-buffer code-buffer
-        (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
-          (with-current-buffer (pynt-notebook-buffer namespace)
-            (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
-    (error nil))
+    ;; Delete notebook window.
+    (condition-case nil
+        (with-current-buffer code-buffer
+          (when (pynt-notebook-window)
+            (delete-window (pynt-notebook-window))))
+      (error nil))
 
-  ;; Reattach to underlying file and save to disk. Save the file for real. Don't
-  ;; detach from it. But also don't disable this for other buffers using pynt
-  ;; mode.
-  (with-current-buffer code-buffer
-    (write-file pynt-code-buffer-file-name)
-    (advice-remove 'save-buffer 'pynt-reattach-save-detach)
-    (save-buffer)
-    (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
+    ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
+    ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
+    ;; may be only when the notebook is deemed "modified" by EIN (or not). In any
+    ;; event do our best to clean up.
+    (condition-case nil
+        (with-current-buffer code-buffer
+          (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
+            (with-current-buffer (pynt-notebook-buffer namespace)
+              (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
+      (error nil))
 
-  ;; Delete all the notebook files.
-  (with-current-buffer code-buffer
-    (dolist (notebook-file pynt-notebook-files)
-      (delete-file notebook-file))
-    (message (format "Deleted %s" pynt-notebook-files))))
+    ;; Reattach to underlying file and save to disk. Save the file for real. Don't
+    ;; detach from it. But also don't disable this for other buffers using pynt
+    ;; mode.
+    (with-current-buffer code-buffer
+      (write-file pynt-code-buffer-file-name)
+      (advice-remove 'save-buffer 'pynt-reattach-save-detach)
+      (save-buffer)
+      (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
+
+    ;; Delete all the notebook files.
+    (with-current-buffer code-buffer
+      (dolist (notebook-file pynt-notebook-files)
+        (delete-file notebook-file))
+      (message (format "Deleted %s" pynt-notebook-files)))))
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))

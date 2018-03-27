@@ -294,9 +294,6 @@ Do it so the cell which corresponds to the line of code the point
 is on goes to the top.  Make sure the cell we're about to jump to
 is is indeed the active buffer.
 
-Go off of the variable `pynt-nth-cell-instance' in the case where
-we want to see the nth pass though, say, a for loop.
-
 Wrap the main logic in a condition case because it could be the
 case that the cell that did correspond to a line has since been
 deleted. Basically there is a bunch of data invalidation that I
@@ -318,30 +315,6 @@ don't want to worry about at this time."
                         (recenter point-line)))
                   (pynt-switch-to-namespace namespace)))
             ('error)))))))
-
-(defun pynt-prev-cell-instance ()
-  "Scroll the EIN worksheet to the next occurrence of the current code line.
-
-This only happens in the body of for and while loops where some
-lines of code and executed many times.
-
-This function is part of pynt scroll mode."
-  (interactive)
-  (setq pynt-nth-cell-instance (1- pynt-nth-cell-instance))
-  (pynt-scroll-cell-window)
-  (message "iteration # = %s" pynt-nth-cell-instance))
-
-(defun pynt-next-cell-instance ()
-  "Scroll the EIN worksheet to the previous occurrence of the current code line.
-
-This only happens in the body of for and while loops where some
-lines of code and executed many times.
-
-This function is part of pynt scroll mode."
-  (interactive)
-  (setq pynt-nth-cell-instance (1+ pynt-nth-cell-instance))
-  (pynt-scroll-cell-window)
-  (message "iteration # = %s" pynt-nth-cell-instance))
 
 (defun pynt-pop-up-notebook-buffer (buffer)
   "Pop up the notebook window.
@@ -584,7 +557,7 @@ IPython kernels."
          (extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
                         "--Session.key=b'\"\"'"))
          (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
-    (ein:jupyter-server-start server-cmd-path notebook-directory)))
+    (ein:jupyter-server-start server-cmd-path notebook-directory nil)))
 
 (defun pynt-reattach-save-detach (f &rest args)
   (if (not (called-interactively-p 'interactive))
@@ -683,43 +656,50 @@ This involves creating a notebook if we haven't created one yet."
   ;; from within the code buffer.
   (setq code-buffer (or buffer (current-buffer)))
 
-  ;; pynt mode may have already been deactivated and we are run by
-  ;; `kill-emacs-hook'. In that case `code-buffer' is nil because it doesn't
-  ;; exist anymore and we exit.
-  (when (buffer-live-p code-buffer)
+  ;; Delete notebook window.
+  (condition-case nil
+      (with-current-buffer code-buffer
+        (when (pynt-notebook-window)
+          (delete-window (pynt-notebook-window))))
+    (error nil))
 
-    ;; Delete notebook window.
-    (condition-case nil
-        (with-current-buffer code-buffer
-          (when (pynt-notebook-window)
-            (delete-window (pynt-notebook-window))))
-      (error nil))
+  ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
+  ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
+  ;; may be only when the notebook is deemed "modified" by EIN (or not). In any
+  ;; event do our best to clean up.
+  (condition-case nil
+      (with-current-buffer code-buffer
+        (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
+          (with-current-buffer (pynt-notebook-buffer namespace)
+            (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
+    (error nil))
 
-    ;; Kill kernels. Sometimes EIN deletes the notebooks before we can get here.
-    ;; Hence the function `pynt-notebook-buffer' sometimes returns nil. But this
-    ;; may be only when the notebook is deemed "modified" by EIN (or not). In any
-    ;; event do our best to clean up.
-    (condition-case nil
-        (with-current-buffer code-buffer
-          (dolist (namespace (map-keys pynt-namespace-to-notebook-map))
-            (with-current-buffer (pynt-notebook-buffer namespace)
-              (call-interactively 'ein:notebook-kill-kernel-then-close-command))))
-      (error nil))
+  ;; Reattach to underlying file and save to disk. Save the file for real. Don't
+  ;; detach from it. But also don't disable this for other buffers using pynt
+  ;; mode.
+  (with-current-buffer code-buffer
+    (write-file pynt-code-buffer-file-name)
+    (advice-remove 'save-buffer 'pynt-reattach-save-detach)
+    (save-buffer)
+    (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
-    ;; Reattach to underlying file and save to disk. Save the file for real. Don't
-    ;; detach from it. But also don't disable this for other buffers using pynt
-    ;; mode.
-    (with-current-buffer code-buffer
-      (write-file pynt-code-buffer-file-name)
-      (advice-remove 'save-buffer 'pynt-reattach-save-detach)
-      (save-buffer)
-      (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
+  ;; Delete all the notebook files.
+  (with-current-buffer code-buffer
+    (dolist (notebook-file pynt-notebook-files)
+      (delete-file notebook-file))
+    (message (format "Deleted %s" pynt-notebook-files)))
 
-    ;; Delete all the notebook files.
-    (with-current-buffer code-buffer
-      (dolist (notebook-file pynt-notebook-files)
-        (delete-file notebook-file))
-      (message (format "Deleted %s" pynt-notebook-files)))))
+  ;; Disable ein connect mode.
+  (with-current-buffer code-buffer
+    (when ein:connect-mode
+      (ein:connect-mode))))
+
+(defun pynt-deactivate-buffers ()
+  "Clean up pynt mode from all the buffers."
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when pynt-mode
+        (pynt-mode-deactivate buffer)))))
 
 (defvar pynt-mode-map
   (let ((map (make-sparse-keymap)))
@@ -745,7 +725,6 @@ This involves creating a notebook if we haven't created one yet."
         (setq pynt-namespace-to-notebook-map (make-hash-table :test 'equal)
               pynt-namespace-to-kernel-pid-map (make-hash-table :test 'equal)
               pynt-line-to-cell-map (make-hash-table :test 'equal)
-              pynt-nth-cell-instance 0
               pynt-code-buffer-file-name (buffer-file-name)
               pynt-code-buffer (current-buffer))
 
@@ -756,7 +735,7 @@ This involves creating a notebook if we haven't created one yet."
         ;; Hooks.
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
         (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
-        (add-hook 'kill-emacs-hook (apply-partially 'pynt-mode-deactivate (current-buffer)))
+        (add-hook 'kill-emacs-hook 'pynt-deactivate-buffers)
         (add-hook 'kill-buffer-hook 'pynt-mode-deactivate nil :local)
         (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 

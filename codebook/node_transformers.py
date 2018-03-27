@@ -195,13 +195,12 @@ class IPythonEmbedder(ast.NodeTransformer):
 
             ```
             import os
-            if os.fork() > 0:
-                import time
-                time.sleep(1)
-                os._exit(0)
-            open(f'{os.environ["HOME"]}/.pynt', 'a').close()
-            import IPython
-            IPython.start_kernel(user_ns={**locals(), **globals(), **vars()})
+            pid = os.fork()
+            if os.fork() == 0:
+                open(f'{os.environ["HOME"]}/.pynt', 'a').close()
+                import IPython
+                IPython.start_kernel(user_ns={**locals(), **globals(), **vars()})
+            os.waitpid(pid, 0)
             ```
 
         This is a purely functional method which always return the same thing.

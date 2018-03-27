@@ -753,6 +753,7 @@ This involves creating a notebook if we haven't created one yet."
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
         (add-hook 'post-command-hook 'pynt-scroll-cell-window nil :local)
         (add-hook 'kill-emacs-hook (apply-partially 'pynt-mode-deactivate (current-buffer)))
+        (add-hook 'kill-buffer-hook 'pynt-mode-deactivate nil :local)
         (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
     (pynt-mode-deactivate)))

@@ -10,6 +10,12 @@ Emacs minor mode for generating and interacting with jupyter notebooks.
 
 ## Quick Start
 
+First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/).
+
+```
+pip install codebook
+```
+
 pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
 
 ```
@@ -20,18 +26,24 @@ M-x pynt-mode
 
 ## Feature List
 
+- *Jupyter notebook server management*
+  - A jupyter notebook server will be started in your home directory when you start emacs so you don't have to.
 - *On-the-fly notebook creation*
-  - Simply start pynt-mode on a python file and a new notebook will be created for you to interact with (provided you have set the variable `pynt-start-jupyter-server-on-startup` to `t`)
-- *Dump a region of python code into a jupyter notebook*
-  - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
+  - Every code region gets its own jupyter notebook and these jupyter notebooks are generated automatically.
+- *Attach a jupyter notebook to a running process*
+  - Launch a process from the command line which hits the code region. Restart the kernel in the notebook to attach to that process.
+- *Dump code into jupyter notebooks*
+  - No more copy and pasting from code into jupyter notebooks. Each expression gets its own cell. Assignment expressions are further transformed so that when you evaluate its cell the value of the target is displayed.
+- *Loop rewriting*
+  - Unroll the first pass of loops for easy interaction in a notebook.
 - *Scroll the resulting jupyter notebook with the code buffer*
-  - Alignment between code and cells are preserved even when cells are added and deleted
-- *Generate web-browser-based jupyter notebooks*
-  - Because pynt generates [EIN](http://millejoh.github.io/emacs-ipython-notebook/) notebooks you can hit `C-x C-s` on the generated notebook which can be [opened up](#jupyter-notebook-web-browser-client) by a jupyter notebook web browser client
+  - Scrolling the code buffer scrolls the notebook along with it, even when cells are modified.
+- *Multiple notebooks in one window*
+  - Put code and tests on top of each other and have their corresponding notebooks alongside.
 
 ## Using pynt
 
-Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycling though the resulting code regions. Once you have made a selection hit `C-c C-e` to dump that code region into a jupyter notebook.
+Once you have opened a python file and pynt mode is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycling though the resulting code regions. Once you have made a selection hit `C-c C-e` to dump that code region into a jupyter notebook.
 
 It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
 

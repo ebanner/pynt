@@ -381,8 +381,7 @@ point to another window. In general buffer names are not to be
 relied on remember!"
   (interactive)
   (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-    (let* ((dir-path (substring (file-name-directory pynt-code-buffer-file-name) 0 -1))
-           (nb-dir (replace-regexp-in-string (expand-file-name "~/") "" dir-path))
+    (let* ((nb-dir (replace-regexp-in-string ein:jupyter-default-notebook-directory "" default-directory))
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (setq pynt-pop-up-notebook pop-up-notebook)
@@ -552,12 +551,10 @@ Start it in the user's home directory and use the
 `ExternalIPythonKernelManager' so we can attach to external
 IPython kernels."
   (interactive)
-  (let* ((server-cmd-path ein:jupyter-default-server-command)
-         (notebook-directory (expand-file-name "~"))
-         (extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
+  (let* ((extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
                         "--Session.key=b'\"\"'"))
          (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
-    (ein:jupyter-server-start server-cmd-path notebook-directory nil)))
+    (ein:jupyter-server-start ein:jupyter-default-server-command ein:jupyter-default-notebook-directory)))
 
 (defun pynt-reattach-save-detach (f &rest args)
   (if (not (called-interactively-p 'interactive))
@@ -591,8 +588,8 @@ won't run until this finishes."
           (pynt-connect-to-notebook-buffer (pynt-notebook-buffer))
           (pynt-detach-from-underlying-file))))))
 
-(defun pynt-connect-to-notebook-buffer (notebook-buffer-name)
-  (ein:connect-to-notebook-buffer notebook-buffer-name)
+(defun pynt-connect-to-notebook-buffer (notebook-buffer)
+  (ein:connect-to-notebook-buffer notebook-buffer)
   (when (not (slot-value ein:%connect% 'autoexec))
     (ein:connect-toggle-autoexec)))
 
@@ -690,9 +687,7 @@ This involves creating a notebook if we haven't created one yet."
     (message (format "Deleted %s" pynt-notebook-files)))
 
   ;; Disable ein connect mode.
-  (with-current-buffer code-buffer
-    (when ein:connect-mode
-      (ein:connect-mode))))
+  (ein:connect-mode -1))
 
 (defun pynt-deactivate-buffers ()
   "Clean up pynt mode from all the buffers."

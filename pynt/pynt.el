@@ -385,7 +385,10 @@ relied on remember!"
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (setq pynt-pop-up-notebook pop-up-notebook)
-        (ein:notebooklist-new-notebook url-or-port "python3" nb-dir 'pynt-setup-notebook)))))
+        (ein:notebooklist-new-notebook url-or-port
+                                       (ein:get-kernelspec url-or-port "python3")
+                                       (string-trim-right nb-dir "/")
+                                       'pynt-setup-notebook)))))
 
 (defun pynt-start-epc-server ()
   "Start the EPC server and register its associated handlers.

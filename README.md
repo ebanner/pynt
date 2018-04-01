@@ -1,49 +1,75 @@
 # PYNT (PYthon iNTeractive)
 
-Emacs minor mode for generating and interacting with jupyter notebooks.
+Get your code into a jupyter notebook. Anytime. Anywhere.
 
-[![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
-[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt)
-
-- [🎥 Feature Tour (YouTube)](https://youtu.be/wtVF5cMhBjg)
-
-![Demo](/img/demo.gif)
+[![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
 ## Quick Start
 
-pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
+*Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
+
+First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
 
 ```
+$ pip install codebook 
 M-x package-install RET pynt
-C-x C-f my-python-file.py
+```
+
+Finally open some source code and start pynt mode.
+
+```
 M-x pynt-mode
 ```
 
-## Feature List
+## Selected Features
 
-- *On-the-fly notebook creation*
-  - Simply start pynt-mode on a python file and a new notebook will be created for you to interact with (provided you have set the variable `pynt-start-jupyter-server-on-startup` to `t`)
-- *Dump a region of python code into a jupyter notebook*
-  - Selectable regions include functions, methods, and code at the module level (i.e. outside of any function or class)
-- *Scroll the resulting jupyter notebook with the code buffer*
-  - Alignment between code and cells are preserved even when cells are added and deleted
-- *Generate web-browser-based jupyter notebooks*
-  - Because pynt generates [EIN](http://millejoh.github.io/emacs-ipython-notebook/) notebooks you can hit `C-x C-s` on the generated notebook which can be [opened up](#jupyter-notebook-web-browser-client) by a jupyter notebook web browser client
+### On-the-fly notebook creation
+
+No more copy and pasting code into jupyter notebooks. Expressions are automatically inserted into their own cells.
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate-notebook.gif)
+
+### Attach a jupyter notebook to a running process
+
+Run a command which hits the code in the notebook. Restart the notebook kernel to attach to that process.
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/attach%20notebook.gif)
+  
+### Syntax transformations
+
+Unroll the first pass of loops for increased interactivity.
+  
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/loop%20unrolling.gif)
+
+### Scroll the resulting jupyter notebook with the code buffer
+
+Never forget which cell a code line corresponds to.
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/scroll-notebook.gif)
+
+## What is pynt?
+
+pynt is an emacs minor mode for getting regions of code (e.g. function and methods) into jupyter notebooks. If you have access to the source and a command to call it with then you can get your code into a jupyter notebook.
+
+However, just pasting your code into one big jupyter notebook cell is not particularly useful. pynt also
+
+- splits up code into cells so it's easy to evaluate small bits
+- sets up the state required to run code (by allowing you to attach notebooks to external processes)
+- takes code tucked away in namespaces (e.g. functions and loops) and promotes them to the global namespace so you can interact with them
 
 ## Using pynt
 
-Once you have opened a python file and `pynt-mode` is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycling though the resulting code regions. Once you have made a selection hit `C-c C-e` to dump that code region into a jupyter notebook.
+It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt at its core is a tool to make working with EIN easier.
 
-It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
+Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`.
 
-## EIN Tweaks
+If you want to attach a jupyter notebook to a running process, then run a command which hits the jupyter notebook code. Restart the jupyter notebook kernel with `C-c C-r` (`ein:notebook-restart-kernel-command`). When you see the message `ein: [info] Starting channels WS: ...` your notebook is attached!
 
-There are a few tweaks to EIN that make the pynt/EIN experience nicer IMO.
+## How pynt works
 
-- Have `C-<return>` and `S-<return>` behave [as they would in a jupyter web browser client](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L473-L476)
-- [Arrow through the worksheets](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L479-L480) in a EIN notebook buffer (warning: [evil](https://github.com/emacs-evil/evil)-specific)
-- Prevent jupyter from [popping open a new tab](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L496) in your web browser on startup
+pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to.
 
+pynt also makes heavy use of the [`ast`](https://docs.python.org/3/library/ast.html) module to parse your code into chunks which are then dumped into notebook cells.
 
 ## Related Projects
 
@@ -56,13 +82,4 @@ pynt is a tool that truly [stands on the shoulders of giants](https://en.wikiped
 - [Python](https://www.python.org/)
 - [SLIME](https://common-lisp.net/project/slime/)
   - [vim-slime](https://github.com/jpalardy/vim-slime)
-
-## Screenshots
-
-### Jupyter Notebook Web Browser Client
-
-![Browser](/img/browser.png)
-
-### Emacs IPython Notebook Client
-
-![EIN](/img/ein.png)
+  

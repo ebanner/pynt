@@ -1,0 +1,5 @@
+{
+    "test_node_transformers.TestSupport.test_upcase": [
+        "python -m unittest tests.test_node_transformers.TestSupport.test_upcase"
+    ]
+}

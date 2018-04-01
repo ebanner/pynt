@@ -1,0 +1,18 @@
+{
+  "tests": {
+    "runner": "nosetests",
+    "directory": "codebook/tests"
+  },
+  "lazy-commands": {
+    "codebook/node_transformers.IPythonEmbedder.get_kernel_embed": "ein:connect-run-or-eval-buffer",
+    "codebook/syntax.promote_loop": "ein:connect-run-or-eval-buffer"
+  },
+  "testable": [
+    "codebook/syntax.annotate",
+    "codebook/node_transformers.FirstPassForSimple.visit_For"
+  ],
+  "module-commands": {
+    "codebook/*": "ein:connect-run-or-eval-buffer",
+    "bin/*": "ein:connect-run-or-eval-buffer"
+  }
+}

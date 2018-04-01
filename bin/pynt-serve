@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+import epc.server
+
+import codebook.syntax
+
+"""List of functions to expose to EPC client"""
+funcs = [
+    codebook.syntax.annotate,
+    codebook.syntax.parse_namespaces,
+    codebook.syntax.embed,
+    codebook.syntax.annotate_toplevel,
+    codebook.syntax.expand_loop,
+]
+
+if __name__ == '__main__':
+    # create server
+    server = epc.server.EPCServer(('localhost', 0))
+    for func in funcs:
+        server.register_function(func)
+
+    # serve
+    server.print_port()
+    server.serve_forever()

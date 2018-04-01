@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+"""Embed a IPython kernel into a function
+
+Script for embedding a IPython kernel into a function so we can open a jupyter
+notebook and talk to it.
+
+"""
+
+import ast
+import logging
+import os
+import shutil
+import subprocess
+import tempfile
+
+import astor
+import jupyter_core
+import plac
+
+from codebook.node_transformers import IPythonEmbedder
+
+FORMAT = '\n============ %(message)s ============\n'
+logging.basicConfig(level=logging.INFO, format=FORMAT)
+
+
+@plac.annotations(
+        namespace=('function to embed a kernel in', 'option', None, str),
+)
+def main(namespace):
+    """Embed a kernel in `fname` in `namespace`
+
+    Args:
+        namespace (str): function to embed a kernel in
+
+    Returns:
+        None
+
+    `namespace` is of the form module.(class.)?[method|func]
+
+    Examples:
+        - my_module
+        - my_module.my_func
+        - my_module.MyClass.my_func
+
+    >>> namespace = 'biz.bar'
+
+    """
+    # Compute path to file
+    dirname, ns = os.path.dirname(namespace), os.path.basename(namespace)
+    module = '.'.join([ns.split('.')[0], 'py'])
+    path = '/'.join([dirname, module]) if dirname else module
+
+    # Read in Input File
+    with open(path) as f:
+        lines = f.readlines()
+    code = ''.join(lines)
+
+    # Embed an IPython Kernel into the Function
+    tree = ast.parse(code)
+    t = IPythonEmbedder(ns).visit(tree)
+    code_ = astor.to_source(t)
+
+    # Copy the Old File to a Temporary File
+    t = tempfile.NamedTemporaryFile(delete=False)
+    shutil.copyfile(path, t.name)
+
+    # Dump New Code to `path`
+    with open(path, 'w') as f:
+        f.write(code_)
+
+    # Write .pynt to runtime dir so a kernel (re)start will attach to this
+    # kernel
+    # runtime_dir = jupyter_core.paths.jupyter_runtime_dir()
+    # open(f'{runtime_dir}/.pynt', 'a').close()
+
+
+if __name__ == '__main__':
+    plac.call(main)

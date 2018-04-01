@@ -24,22 +24,30 @@ C-x C-f my-python-file.py
 M-x pynt-mode
 ```
 
-## Feature List
+## Selected Features
 
-- *Jupyter notebook server management*
-  - A jupyter notebook server will be started in your home directory when you start emacs so you don't have to.
-![alt text](https://github.com/ebanner/pynt-assets/blob/master/img/jupyter-server.png "Logo Title Text 1")
+### On-the-fly notebook creation
 
-- *On-the-fly notebook creation*
-  - Every code region gets its own jupyter notebook and these jupyter notebooks are generated automatically.
-- *Attach a jupyter notebook to a running process*
-  - Launch a process from the command line which hits the code region. Restart the kernel in the notebook to attach to that process.
-- *Dump code into jupyter notebooks*
-  - No more copy and pasting from code into jupyter notebooks. Each expression gets its own cell. Assignment expressions are further transformed so that when you evaluate its cell the value of the target is displayed.
-- *Loop rewriting*
-  - Unroll the first pass of loops for easy interaction in a notebook.
-- *Scroll the resulting jupyter notebook with the code buffer*
-  - Scrolling the code buffer scrolls the notebook along with it, even when cells are modified.
+No more copy and pasting from code into jupyter notebooks. Expressions are split up into their own cells.
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate%20notebook.gif)
+
+### Attach a jupyter notebook to a running process
+
+Launch a process from the command line which hits the code region. Restart the kernel in the notebook to attach to that process.
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/attach%20notebook.gif)
+  
+### Syntax transformations
+
+Unroll the first pass of loops for increased interactivity.
+  
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/loop%20unrolling.gif)
+
+### Scroll the resulting jupyter notebook with the code buffer
+
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/scroll-notebook.gif)
+
 - *Multiple notebooks in one window*
   - Put code and tests on top of each other and have their corresponding notebooks alongside.
 

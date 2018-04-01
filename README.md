@@ -26,7 +26,7 @@ M-x pynt-mode
 
 No more copy and pasting from code into jupyter notebooks. Expressions are split up into their own cells.
 
-![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate%20notebook.gif)
+![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate-notebook.gif)
 
 ### Attach a jupyter notebook to a running process
 

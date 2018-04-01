@@ -1,6 +1,6 @@
 # PYNT (PYthon iNTeractive)
 
-Emacs minor mode for generating and interacting with jupyter notebooks.
+Emacs minor mode for generating and interacting with [Emacs IPython](http://millejoh.github.io/emacs-ipython-notebook/) (i.e. jupyter) notebooks.
 
 [![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
@@ -24,13 +24,13 @@ M-x pynt-mode
 
 ### On-the-fly notebook creation
 
-No more copy and pasting from code into jupyter notebooks. Expressions are split up into their own cells.
+No more copy and pasting from code into jupyter notebooks. Expressions are automatically inserted into their own cells.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate-notebook.gif)
 
 ### Attach a jupyter notebook to a running process
 
-Run a command which hits the code region. Restart the notebook kernel to attach to that process.
+Run a command which hits the code in the jupyter notebook. Restart the notebook kernel to attach to that process.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/attach%20notebook.gif)
   
@@ -48,18 +48,11 @@ Never forget which cell a code line corresponds to.
 
 ## Using pynt
 
-Once you have opened a python file and pynt mode is active you should select the region of code you would like to dump into a jupyter notebook by typing `C-c C-s` and cycling though the resulting code regions. Once you have made a selection hit `C-c C-e` to dump that code region into a jupyter notebook.
+It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt at its core is a tool to make working with EIN easier.
 
-It is recommended at this point to enable `pynt-scroll-mode` which scrolls (i.e. aligns) the notebook cells with the code lines. You can activate `pynt-scroll-mode` with `M-x pynt-scroll-mode RET`.
+Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`.
 
-## EIN Tweaks
-
-There are a few tweaks to EIN that make the pynt/EIN experience nicer IMO.
-
-- Have `C-<return>` and `S-<return>` behave [as they would in a jupyter web browser client](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L473-L476)
-- [Arrow through the worksheets](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L479-L480) in a EIN notebook buffer (warning: [evil](https://github.com/emacs-evil/evil)-specific)
-- Prevent jupyter from [popping open a new tab](https://github.com/ebanner/dotfiles/blob/deed94b024612ca1ed9c1e98f8e98ade793208a2/spacemacs#L496) in your web browser on startup
-
+If you want to attach a jupyter notebook to a running process, then run a command which hits the jupyter notebook code. Restart the jupyter notebook with `C-c C-r` (`ein:notebook-restart-kernel-command`). When you see the message `ein: [info] Starting channels WS: ...` your notebook is attached!
 
 ## Related Projects
 
@@ -72,13 +65,4 @@ pynt is a tool that truly [stands on the shoulders of giants](https://en.wikiped
 - [Python](https://www.python.org/)
 - [SLIME](https://common-lisp.net/project/slime/)
   - [vim-slime](https://github.com/jpalardy/vim-slime)
-
-## Screenshots
-
-### Jupyter Notebook Web Browser Client
-
-![Browser](/img/browser.png)
-
-### Emacs IPython Notebook Client
-
-![EIN](/img/ein.png)
+  

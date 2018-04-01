@@ -4,23 +4,6 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 
 [![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
-## Quick Start
-
-*Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
-
-First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
-
-```
-$ pip install codebook 
-M-x package-install RET pynt
-```
-
-Finally open some source code and start pynt mode.
-
-```
-M-x pynt-mode
-```
-
 ## Selected Features
 
 ### On-the-fly notebook creation
@@ -46,6 +29,23 @@ Unroll the first pass of loops for increased interactivity.
 Never forget which cell a code line corresponds to.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/scroll-notebook.gif)
+
+## Quick Start
+
+*Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
+
+First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
+
+```
+$ pip install codebook 
+M-x package-install RET pynt
+```
+
+Finally open some source code and start pynt mode.
+
+```
+M-x pynt-mode
+```
 
 ## What is pynt?
 

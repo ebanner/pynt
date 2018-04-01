@@ -28,6 +28,8 @@ M-x pynt-mode
 
 - *Jupyter notebook server management*
   - A jupyter notebook server will be started in your home directory when you start emacs so you don't have to.
+![alt text](https://github.com/ebanner/pynt-assets/blob/master/img/jupyter-server.png "Logo Title Text 1")
+
 - *On-the-fly notebook creation*
   - Every code region gets its own jupyter notebook and these jupyter notebooks are generated automatically.
 - *Attach a jupyter notebook to a running process*

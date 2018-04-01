@@ -11,14 +11,14 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
 
 ```
-$ pip install codebook
-M-x package-install RET pynt
+$ pip install codebook        # bash/zsh
+M-x package-install RET pynt  ; emacs
 ```
 
 Finally open some source code and start pynt mode.
 
 ```
-M-x pynt-mode
+M-x pynt-mode                 ; emacs
 ```
 
 ## Selected Features
@@ -51,7 +51,11 @@ Never forget which cell a code line corresponds to.
 
 pynt is an emacs minor mode for getting regions of code (e.g. function and methods) into jupyter notebooks. If you have access to the source and a command to call it with then you can get your code into a jupyter notebook.
 
-pynt strives to make it possible to promote all regions of code into the global namespace. Examples include functions, methods, and loops. Once your code is in the global namespace it becomes possible to interact with it.
+However, just pasting code into one notebook cell is not particularly useful. pynt also
+
+- splits up code into cells so it's easy to evaluate small bits
+- sets up the state required to run code (by allowing you to attach notebooks to external processes)
+- takes code tucked away in namespaces (e.g. functions and loops) and promotes them to the global namespace so you can interact with them
 
 ## Using pynt
 
@@ -64,6 +68,8 @@ If you want to attach a jupyter notebook to a running process, then run a comman
 ## How it works
 
 pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to.
+
+pynt also makes heavy use of the [`ast`](https://docs.python.org/3/library/ast.html) module to parse your code into chunks which are then dumped into notebook cells.
 
 ## Related Projects
 

@@ -8,19 +8,14 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 
 *Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
 
-First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/).
+First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
 
 ```
-pip install codebook
-```
-
-Then open emacs and download and install pynt through [MELPA](https://melpa.org/#/pynt).
-
-```
+$ pip install codebook
 M-x package-install RET pynt
 ```
 
-Finally open some source code and activate pynt mode.
+Finally open some source code and start pynt mode.
 
 ```
 M-x pynt-mode

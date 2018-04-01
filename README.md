@@ -30,7 +30,7 @@ No more copy and pasting from code into jupyter notebooks. Expressions are split
 
 ### Attach a jupyter notebook to a running process
 
-Launch a process from the command line which hits the code region. Restart the kernel in the notebook to attach to that process.
+Run a command which hits the code region. Restart the notebook kernel to attach to that process.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/attach%20notebook.gif)
   
@@ -42,7 +42,7 @@ Unroll the first pass of loops for increased interactivity.
 
 ### Scroll the resulting jupyter notebook with the code buffer
 
-Maintain a tight correspondence between code lines and notebook cells.
+Never forget which cell a code line corresponds to.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/scroll-notebook.gif)
 

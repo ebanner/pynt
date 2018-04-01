@@ -9,8 +9,8 @@ def readme():
 
 setup(
     name='codebook',
-    version='1.1.0',
-    description='Emacs minor mode for generating and interacting with jupyter notebooks',
+    version='1.2.1',
+    description='Emacs minor mode for generating EIN notebooks',
     long_description=readme(),
     url='http://github.com/ebanner/pynt',
     classifiers=[

@@ -326,7 +326,8 @@ of each other and their notebooks to the right."
       (save-selected-window
         (windmove-right)
         (switch-to-buffer buffer))
-    (error nil (display-buffer (window-normalize-buffer-to-switch-to buffer) nil))))
+    (error nil (with-selected-window (split-window-horizontally)
+                 (switch-to-buffer buffer)))))
 
 (defun pynt-rename-notebook ()
   "Rename the notebook to the current namespace.

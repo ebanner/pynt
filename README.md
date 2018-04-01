@@ -23,7 +23,6 @@ M-x package-install RET pynt
 Finally open some source code and activate pynt mode.
 
 ```
-C-x C-f my-python-file.py
 M-x pynt-mode
 ```
 

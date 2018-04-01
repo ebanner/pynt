@@ -14,10 +14,15 @@ First install the codebook module [from PyPI](https://pypi.python.org/pypi/codeb
 pip install codebook
 ```
 
-pynt is [available](https://melpa.org/#/pynt) for download through [MELPA](https://melpa.org/). Once you have [configured](https://melpa.org/#/getting-started) emacs to use MELPA then run the following commands in emacs.
+Then open emacs and download and install pynt through [MELPA](https://melpa.org/#/pynt).
 
 ```
 M-x package-install RET pynt
+```
+
+Finally open some source code and activate pynt mode.
+
+```
 C-x C-f my-python-file.py
 M-x pynt-mode
 ```

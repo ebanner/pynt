@@ -8,7 +8,7 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 
 ### On-the-fly notebook creation
 
-No more copy and pasting code into jupyter notebooks. Each expression gets its own cell.
+No more copy and pasting code into jupyter notebooks. Each line of code gets its own cell.
 
 ![Alt Text](https://github.com/ebanner/pynt-assets/blob/master/gif/generate-notebook.gif)
 

@@ -28,6 +28,8 @@
 (require 'epcs)
 (require 'ein-jupyter)
 
+(add-to-list 'auto-mode-alist (cons (purecopy "\\.py[iw]?\\'") 'pynt-mode))
+
 (defgroup pynt nil
   "Customization group for pynt."
   :group 'applications)
@@ -717,6 +719,7 @@ This involves creating a notebook if we haven't created one yet."
     (define-key map (kbd "<down>") 'pynt-prev-cell-instance)
     map))
 
+;;;###autoload
 (define-minor-mode pynt-mode
   "Minor mode for generating and interacting with jupyter notebooks via EIN
 

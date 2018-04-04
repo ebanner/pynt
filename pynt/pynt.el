@@ -29,7 +29,7 @@
 (require 'ein-jupyter)
 
 ;;;###autoload
-(add-to-list 'auto-mode-alist (cons (purecopy "\\.py[iw]?\\'") 'pynt-mode))
+(add-to-list 'auto-mode-alist (cons (purecopy "\\.py[iw]?\\'") 'pynt-mode) :append)
 
 (defgroup pynt nil
   "Customization group for pynt."

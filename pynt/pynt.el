@@ -28,6 +28,7 @@
 (require 'epcs)
 (require 'ein-jupyter)
 
+;;;###autoload
 (add-to-list 'auto-mode-alist (cons (purecopy "\\.py[iw]?\\'") 'pynt-mode))
 
 (defgroup pynt nil

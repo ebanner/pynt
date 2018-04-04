@@ -748,7 +748,7 @@ This involves creating a notebook if we haven't created one yet."
 
     (pynt-mode-deactivate)))
 
-;; Hook into python mode.
+;;;###autoload
 (add-hook 'python-mode-hook
           (lambda ()
             (when (not (string-match-p (regexp-quote "ein:") (buffer-name)))

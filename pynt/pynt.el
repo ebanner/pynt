@@ -28,9 +28,6 @@
 (require 'epcs)
 (require 'ein-jupyter)
 
-;;;###autoload
-(add-to-list 'auto-mode-alist (cons (purecopy "\\.py[iw]?\\'") 'pynt-mode) :append)
-
 (defgroup pynt nil
   "Customization group for pynt."
   :group 'applications)
@@ -750,6 +747,12 @@ This involves creating a notebook if we haven't created one yet."
         (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
     (pynt-mode-deactivate)))
+
+;; Hook into python mode.
+(add-hook 'python-mode-hook
+          (lambda ()
+            (when (not (string-match-p (regexp-quote "ein:") (buffer-name)))
+              (pynt-mode))))
 
 (provide 'pynt)
 ;;; pynt.el ends here

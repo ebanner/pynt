@@ -34,7 +34,7 @@ Never forget which cell a code line corresponds to.
 
 *Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
 
-First install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
+Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
 
 ```
 $ pip install codebook 

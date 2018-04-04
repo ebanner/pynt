@@ -553,12 +553,18 @@ just return the current directory."
 
 Start it in the user's home directory and use the
 `ExternalIPythonKernelManager' so we can attach to external
-IPython kernels."
+IPython kernels.
+
+Only start a jupyter notebook server if one has not already been
+started."
   (interactive)
-  (let* ((extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
-                        "--Session.key=b'\"\"'"))
-         (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
-    (ein:jupyter-server-start ein:jupyter-default-server-command ein:jupyter-default-notebook-directory)))
+  (condition-case nil
+      (ein:jupyter-server-conn-info)
+    (error nil
+           (let* ((extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
+                                 "--Session.key=b'\"\"'"))
+                  (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
+             (ein:jupyter-server-start ein:jupyter-default-server-command ein:jupyter-default-notebook-directory)))))
 
 (defun pynt-reattach-save-detach (f &rest args)
   (if (not (called-interactively-p 'interactive))
@@ -730,6 +736,7 @@ This involves creating a notebook if we haven't created one yet."
         ;; Initialize servers.
         (pynt-start-epc-server)
         (pynt-start-ast-server)
+        (pynt-jupyter-server-start)
 
         ;; Hooks.
         (add-hook 'after-change-functions 'pynt-invalidate-scroll-map nil :local)
@@ -739,8 +746,6 @@ This involves creating a notebook if we haven't created one yet."
         (advice-add 'save-buffer :around 'pynt-reattach-save-detach))
 
     (pynt-mode-deactivate)))
-
-(when pynt-start-jupyter-server-on-startup (pynt-jupyter-server-start))
 
 (provide 'pynt)
 ;;; pynt.el ends here

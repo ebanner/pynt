@@ -41,11 +41,7 @@ $ pip install codebook
 M-x package-install RET pynt
 ```
 
-Finally open some source code and start pynt mode.
-
-```
-M-x pynt-mode
-```
+The next time you visit a python file pynt mode will be active.
 
 ## What is pynt?
 

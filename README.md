@@ -45,7 +45,7 @@ The next time you visit a python file pynt mode will be active.
 
 ## What is pynt?
 
-pynt is an emacs minor mode for getting regions of code (e.g. function and methods) into jupyter notebooks. If you have access to source code and a command to call it with then you can get your code into a jupyter notebook.
+pynt is an emacs minor mode for getting source code into jupyter notebooks so you can hack on it there. If you have access to source code and a command to call it with then you can get your code into a jupyter notebook.
 
 However, just pasting your code into one big jupyter notebook cell is not particularly useful. pynt also
 

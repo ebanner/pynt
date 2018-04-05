@@ -40,7 +40,7 @@ Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) w
 $ pip install codebook 
 ```
 
-Then install pynt in emacs through [MELPA](https://melpa.org/#/pynt)
+Then install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
 
 ```
 M-x package-install RET pynt

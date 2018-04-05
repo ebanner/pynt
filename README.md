@@ -4,9 +4,9 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 
 [![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
-## Selected Features
+## Features
 
-### On-the-fly notebook creation
+### Generate jupyter notebooks on the fly
 
 No more copy and pasting code into jupyter notebooks. Each line of code gets its own cell.
 
@@ -51,13 +51,13 @@ However, just pasting your code into one big jupyter notebook cell is not partic
 
 - splits up code into cells so it's easy to evaluate small bits
 - sets up the state required to run code (by allowing you to attach notebooks to external processes)
-- takes code tucked away in namespaces (e.g. functions and loops) and promotes them to the global namespace so you can interact with them
+- takes code previously buried in various namespaces (e.g. functions and loops) and exposes them to the global namespace so you can interact with them
 
 ## Using pynt
 
-It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt at its core is a tool to make working with EIN easier.
+It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt, at its core, is a tool to make working with EIN easier.
 
-Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`.
+Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`. If you need to "re-dump" the code into the notebook then hit `C-c C-e`.
 
 If you want to attach a jupyter notebook to a running process, then run a command which hits the jupyter notebook code. Restart the jupyter notebook kernel with `C-c C-r` (`ein:notebook-restart-kernel-command`). When you see the message `ein: [info] Starting channels WS: ...` your notebook is attached!
 

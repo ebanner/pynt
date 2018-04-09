@@ -4,9 +4,9 @@ Get your code into a jupyter notebook. Anytime. Anywhere.
 
 [![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
-## Selected Features
+## Features
 
-### On-the-fly notebook creation
+### Generate jupyter notebooks on the fly
 
 No more copy and pasting code into jupyter notebooks. Each line of code gets its own cell.
 
@@ -34,10 +34,15 @@ Never forget which cell a code line corresponds to.
 
 *Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
 
-Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/) and install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
+Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/).
 
 ```
 $ pip install codebook 
+```
+
+Then install pynt in emacs through [MELPA](https://melpa.org/#/pynt).
+
+```
 M-x package-install RET pynt
 ```
 
@@ -45,25 +50,25 @@ The next time you visit a python file pynt mode will be active.
 
 ## What is pynt?
 
-pynt is an emacs minor mode for getting regions of code (e.g. function and methods) into jupyter notebooks. If you have access to the source and a command to call it with then you can get your code into a jupyter notebook.
+pynt is an emacs minor mode for getting source code into jupyter notebooks so you can hack on it there. If you have access to source code and a command to call it with then you can get your code into a jupyter notebook.
 
 However, just pasting your code into one big jupyter notebook cell is not particularly useful. pynt also
 
 - splits up code into cells so it's easy to evaluate small bits
 - sets up the state required to run code (by allowing you to attach notebooks to external processes)
-- takes code tucked away in namespaces (e.g. functions and loops) and promotes them to the global namespace so you can interact with them
+- takes code previously buried in various namespaces (e.g. functions and loops) and exposes them to the global namespace so you can interact with them
 
 ## Using pynt
 
-It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt at its core is a tool to make working with EIN easier.
+It is highly recommended that you familiarize yourself with [Emacs IPython Notebook (EIN)](http://millejoh.github.io/emacs-ipython-notebook/) first as pynt, at its core, is a tool to make working with EIN easier.
 
-Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`.
+Once you have opened a python file and pynt mode is active, cursor over to the region of code you would like to dump into a notebook and hit `C-c C-s`. If you need to "re-dump" the code into the notebook then hit `C-c C-e`.
 
 If you want to attach a jupyter notebook to a running process, then run a command which hits the jupyter notebook code. Restart the jupyter notebook kernel with `C-c C-r` (`ein:notebook-restart-kernel-command`). When you see the message `ein: [info] Starting channels WS: ...` your notebook is attached!
 
 ## How pynt works
 
-pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to.
+pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to. See [here](https://github.com/ebanner/pynt/wiki/Using-the-standalone-kernel-manager) for more information.
 
 pynt also makes heavy use of the [`ast`](https://docs.python.org/3/library/ast.html) module to parse your code into chunks which are then dumped into notebook cells.
 

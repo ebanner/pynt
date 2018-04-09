@@ -72,6 +72,16 @@ pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attac
 
 pynt also makes heavy use of the [`ast`](https://docs.python.org/3/library/ast.html) module to parse your code into chunks which are then dumped into notebook cells.
 
+## Using the standalone kernel manger
+
+After installing codebook you can start a jupyter server with the following command.
+
+```
+jupyter notebook \
+  --NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager \
+  --Session.key='b""'
+```
+
 ## Related Projects
 
 pynt is a tool that truly [stands on the shoulders of giants](https://en.wikipedia.org/wiki/Standing_on_the_shoulders_of_giants). Here are some projects where if they had not existed, then pynt would not have been possible.

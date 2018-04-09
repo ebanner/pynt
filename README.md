@@ -68,19 +68,9 @@ If you want to attach a jupyter notebook to a running process, then run a comman
 
 ## How pynt works
 
-pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to.
+pynt uses a [custom kernel manager](https://github.com/ebanner/extipy) for attaching to jupyter notebook kernels started via third-party processes. When pynt generates a jupyter notebook from a code region that code region is replaced with a IPython kernel breakpoint so that subsequent commands that hit it will start a jupyter kernel for the notebook to attach to. See [here](https://github.com/ebanner/pynt/wiki/Using-the-standalone-kernel-manager) for more information.
 
 pynt also makes heavy use of the [`ast`](https://docs.python.org/3/library/ast.html) module to parse your code into chunks which are then dumped into notebook cells.
-
-## Using the standalone kernel manger
-
-After installing codebook you can start a jupyter server with the following command.
-
-```
-jupyter notebook \
-  --NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager \
-  --Session.key='b""'
-```
 
 ## Related Projects
 

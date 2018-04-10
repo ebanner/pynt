@@ -47,6 +47,8 @@ currently untested."
   "Scroll the notebook buffer with the code buffer. "
   :options '(nil t))
 
+(defcustom pynt-kernelspec "python3" "Kernelspec to create a notebook with.")
+
 (defcustom pynt-epc-port 9999
   "The port that the EPC server listens on.
 
@@ -382,12 +384,15 @@ point to another window. In general buffer names are not to be
 relied on remember!"
   (interactive)
   (multiple-value-bind (url-or-port token) (ein:jupyter-server-conn-info)
-    (let* ((nb-dir (replace-regexp-in-string ein:jupyter-default-notebook-directory "" default-directory))
+    (let* ((nb-dir (replace-regexp-in-string (or ein:jupyter-default-notebook-directory
+                                                 (expand-file-name "~/"))
+                                             ""
+                                             default-directory))
            (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
       (with-current-buffer notebook-list-buffer-name
         (setq pynt-pop-up-notebook pop-up-notebook)
         (ein:notebooklist-new-notebook url-or-port
-                                       (ein:get-kernelspec url-or-port "python3")
+                                       (ein:get-kernelspec url-or-port pynt-kernelspec)
                                        (string-trim-right nb-dir "/")
                                        'pynt-setup-notebook)))))
 
@@ -564,7 +569,9 @@ started."
            (let* ((extipy-args '("--NotebookApp.kernel_manager_class=codebook.ExternalIPythonKernelManager"
                                  "--Session.key=b'\"\"'"))
                   (ein:jupyter-server-args (append ein:jupyter-server-args extipy-args)))
-             (ein:jupyter-server-start ein:jupyter-default-server-command ein:jupyter-default-notebook-directory)))))
+             (ein:jupyter-server-start (executable-find ein:jupyter-default-server-command)
+                                       (or ein:jupyter-default-notebook-directory
+                                           (expand-file-name "~/")))))))
 
 (defun pynt-reattach-save-detach (f &rest args)
   (if (not (called-interactively-p 'interactive))

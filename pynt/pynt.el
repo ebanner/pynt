@@ -47,6 +47,8 @@ currently untested."
   "Scroll the notebook buffer with the code buffer. "
   :options '(nil t))
 
+(defcustom pynt-kernelspec "python3" "Kernelspec to create a notebook with.")
+
 (defcustom pynt-epc-port 9999
   "The port that the EPC server listens on.
 
@@ -390,7 +392,7 @@ relied on remember!"
       (with-current-buffer notebook-list-buffer-name
         (setq pynt-pop-up-notebook pop-up-notebook)
         (ein:notebooklist-new-notebook url-or-port
-                                       (ein:get-kernelspec url-or-port "python3")
+                                       (ein:get-kernelspec url-or-port pynt-kernelspec)
                                        (string-trim-right nb-dir "/")
                                        'pynt-setup-notebook)))))
 

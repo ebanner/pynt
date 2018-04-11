@@ -387,9 +387,8 @@ relied on remember!"
     (let* ((nb-dir (replace-regexp-in-string (or ein:jupyter-default-notebook-directory
                                                  (expand-file-name "~/"))
                                              ""
-                                             default-directory))
-           (notebook-list-buffer-name (concat "*ein:notebooklist " url-or-port "*")))
-      (with-current-buffer notebook-list-buffer-name
+                                             default-directory)))
+      (with-current-buffer (ein:notebooklist-get-buffer url-or-port)
         (setq pynt-pop-up-notebook pop-up-notebook)
         (ein:notebooklist-new-notebook url-or-port
                                        (ein:get-kernelspec url-or-port pynt-kernelspec)

@@ -503,6 +503,7 @@ class UnpackIf(ast.NodeTransformer):
         nodes = []
         content = f'if {astor.to_source(ifexp.test).strip()}'
         nodes.append(make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=ifexp.lineno))
+        nodes.extend([ifexp.test])
         nodes.extend(ifexp.body)
         nodes.extend(ifexp.orelse)
         return nodes

@@ -8,7 +8,7 @@ from codebook.node_transformers import (DeepAnnotator, DefunFinder,
                                         ExpressionFinder, FirstPassForSimple,
                                         IPythonEmbedder, NamespacePromoter,
                                         ShallowAnnotator, SyntaxRewriter,
-                                        UnpackIf)
+                                        UnpackIf, UnpackTry)
 
 
 def find_func(module, namespace):
@@ -324,53 +324,14 @@ def unpack_annotations(annotations):
         info.append([content, namespace, cell_type, int(lineno)])
     return info
 
-def expand_loop(code, namespace, lineno):
+def unpack(code, namespace, lineno, only_first=True):
     """Extract the information out of a bunch of annotations
 
-    >>> code = '''
-    ...
-    ... for i in range(5):
-    ...     print(i)
-    ...
-    ... '''
-    >>>
-    >>> namespace = 'foo'
-    >>> lineno = 3
-
-    """
-    tree = ast.parse(code)
-    small_tree = filter_away_except(tree, namespace)
-    shallow_tree = NamespacePromoter(buffer=namespace).visit(small_tree)
-    small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
-    unrolled_for = FirstPassForSimple(namespace).visit(small_shallow_tree)
-    annotations = ShallowAnnotator(namespace).visit(unrolled_for)
-    return unpack_annotations(annotations)
-
-def unpack_if(code, namespace, lineno):
-    """Extract the information out of a bunch of annotations
-
-    >>> code = '''
-    ...
-    ... if 1:
-    ...     if 2:
-    ...         print(12)
-    ...
-    ... '''
-    >>>
-    >>> namespace = 'foo'
-    >>> lineno = 3
-
-    """
-    tree = ast.parse(code)
-    small_tree = filter_away_except(tree, namespace)
-    shallow_tree = NamespacePromoter(buffer=namespace).visit(small_tree)
-    small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
-    unrolled_if = UnpackIf(namespace).visit(small_shallow_tree)
-    annotations = ShallowAnnotator(namespace).visit(unrolled_if)
-    return unpack_annotations(annotations)
-
-def unpack(code, namespace, lineno):
-    """Extract the information out of a bunch of annotations
+    Args:
+        code (str) : the whole code buffer
+        namespace (str) : identifier for the region of code
+        lineno (int) : line number of the expression to unpack
+        only_first (bool) : only consider the first branch
 
     >>> code = '''
     ...
@@ -391,6 +352,8 @@ def unpack(code, namespace, lineno):
     expr_type, = small_shallow_tree.body
     if isinstance(expr_type, ast.For):
         unpacked = FirstPassForSimple(namespace).visit(small_shallow_tree)
+    elif isinstance(expr_type, ast.Try):
+        unpacked = UnpackTry(namespace, only_first).visit(small_shallow_tree)
     else:
         assert isinstance(expr_type, ast.If)
         unpacked = UnpackIf(namespace).visit(small_shallow_tree)

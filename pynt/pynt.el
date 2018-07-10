@@ -262,14 +262,19 @@ FIXME this is experimental and not currently used."
           (pynt-log "Annotated code = %s" annotated-code)
           (ein:shared-output-eval-string annotated-code))))))
 
-(defun pynt-unpack ()
-  "Unpack a statement.
+(defun pynt-unpack (only-first)
+  "Unpack an experession.
 
-Applies to the cell corresponding to the line at point."
-  (interactive)
-  (let* ((code (buffer-substring-no-properties (point-min) (point-max))))
+Applies to the cell corresponding to the line at point. Pass the
+universal prefix argument to set TAKE-FIRST to t if you just want
+the first branch of the expression. Only try exps are currently
+supported."
+  (interactive "P")
+  (let* ((code (buffer-substring-no-properties (point-min) (point-max)))
+         (only-first (if only-first 1 0)))
     (deferred:$
-      (epc:call-deferred pynt-ast-server 'unpack `(,code ,pynt-namespace ,(line-number-at-pos)))
+      (message "Making deferred call!")
+      (epc:call-deferred pynt-ast-server 'unpack `(,code ,pynt-namespace ,(line-number-at-pos) ,only-first))
       (deferred:nextc it
         (lambda (cells)
           (with-current-buffer (pynt-notebook-buffer)

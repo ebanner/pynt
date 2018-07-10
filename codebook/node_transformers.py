@@ -473,6 +473,51 @@ class NamespacePromoter(ast.NodeTransformer):
 
         return exprs + func.body
 
+class UnpackTry(ast.NodeTransformer):
+    def __init__(self, buffer, only_try):
+        self.buffer = buffer
+        self.only_try = only_try
+
+    def visit_Try(self, tryexp):
+        """Unpack a try/except line.
+
+        >>> self = UnpackTry('foo', False)
+        >>> code = '''
+        ...
+        ... try:
+        ...     data = requests.get(url, stream=True).raw
+        ... except:
+        ...     print('error')
+        ...
+        ... '''
+        >>> module = ast.parse(code)
+        >>> tryexp, = module.body
+
+        """
+        nodes = []
+        nodes.append(make_annotation(buffer=self.buffer, content='try', cell_type='2', lineno=tryexp.lineno))
+        nodes.extend(tryexp.body)
+        if self.only_try:
+            return nodes
+
+        for handler in tryexp.handlers:
+            handler_toks = ['except']
+            if handler.type:
+                handler_type = astor.to_source(handler.type).strip()
+                handler_toks.append(handler_type)
+            if handler.name:
+                handler_toks.extend(['as', handler.name])
+            handler_str = ' '.join(handler_toks)
+            nodes.append(make_annotation(buffer=self.buffer, content=handler_str, cell_type='2', lineno=tryexp.lineno))
+            nodes.extend(handler.body)
+        if tryexp.orelse:
+            nodes.append(make_annotation(buffer=self.buffer, content='else', cell_type='2', lineno=tryexp.lineno))
+            nodes.extend(tryexp.orelse)
+        if tryexp.finalbody:
+            nodes.append(make_annotation(buffer=self.buffer, content='finally', cell_type='2', lineno=tryexp.lineno))
+            nodes.extend(tryexp.finalbody)
+        return nodes
+
 class UnpackIf(ast.NodeTransformer):
     def __init__(self, buffer):
         self.buffer = buffer

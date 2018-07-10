@@ -3,12 +3,12 @@
 import ast
 
 import astor
-
 import codebook.node_transformers
 from codebook.node_transformers import (DeepAnnotator, DefunFinder,
                                         ExpressionFinder, FirstPassForSimple,
                                         IPythonEmbedder, NamespacePromoter,
-                                        ShallowAnnotator, SyntaxRewriter)
+                                        ShallowAnnotator, SyntaxRewriter,
+                                        UnpackIf)
 
 
 def find_func(module, namespace):
@@ -335,14 +335,64 @@ def expand_loop(code, namespace, lineno):
     ... '''
     >>>
     >>> namespace = 'foo'
-    >>> lineno = 4
+    >>> lineno = 3
 
     """
     tree = ast.parse(code)
     small_tree = filter_away_except(tree, namespace)
-    shallow_tree = NamespacePromoter(buffer=namespace).visit(tree)
+    shallow_tree = NamespacePromoter(buffer=namespace).visit(small_tree)
     small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
     unrolled_for = FirstPassForSimple(namespace).visit(small_shallow_tree)
     annotations = ShallowAnnotator(namespace).visit(unrolled_for)
     return unpack_annotations(annotations)
 
+def unpack_if(code, namespace, lineno):
+    """Extract the information out of a bunch of annotations
+
+    >>> code = '''
+    ...
+    ... if 1:
+    ...     if 2:
+    ...         print(12)
+    ...
+    ... '''
+    >>>
+    >>> namespace = 'foo'
+    >>> lineno = 3
+
+    """
+    tree = ast.parse(code)
+    small_tree = filter_away_except(tree, namespace)
+    shallow_tree = NamespacePromoter(buffer=namespace).visit(small_tree)
+    small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
+    unrolled_if = UnpackIf(namespace).visit(small_shallow_tree)
+    annotations = ShallowAnnotator(namespace).visit(unrolled_if)
+    return unpack_annotations(annotations)
+
+def unpack(code, namespace, lineno):
+    """Extract the information out of a bunch of annotations
+
+    >>> code = '''
+    ...
+    ... if 1:
+    ...     if 2:
+    ...         print(12)
+    ...
+    ... '''
+    >>>
+    >>> namespace = 'foo'
+    >>> lineno = 3
+
+    """
+    tree = ast.parse(code)
+    small_tree = filter_away_except(tree, namespace)
+    shallow_tree = NamespacePromoter(buffer=namespace).visit(small_tree)
+    small_shallow_tree = ExpressionFinder(lineno).visit(shallow_tree)
+    expr_type, = small_shallow_tree.body
+    if isinstance(expr_type, ast.For):
+        unpacked = FirstPassForSimple(namespace).visit(small_shallow_tree)
+    else:
+        assert isinstance(expr_type, ast.If)
+        unpacked = UnpackIf(namespace).visit(small_shallow_tree)
+    annotations = ShallowAnnotator(namespace).visit(unpacked)
+    return unpack_annotations(annotations)

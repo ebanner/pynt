@@ -62,6 +62,31 @@ class ExpressionFinder(ast.NodeTransformer):
     def __init__(self, lineno):
         super(__class__, self).__init__()
         self.lineno = lineno
+        self.target_node = None # found expr
+
+    def generic_visit(self, node):
+        """Catch-all for nodes that slip through
+
+        Basically everything I haven't gotten around to writing a custom
+        annotator for gets caught here and wrapped in an annotation. Currently
+        the one that jumps to mind are context managers.
+
+        This is necessary because some nodes we recursively call `self.visit()`
+        on and we may run into expressions that we have not written a node
+        tranformer for.
+
+        """
+        # try:
+        #     c = astor.to_source(node)
+        #     print(c.strip())
+        #     print(getattr(node, 'lineno', -1))
+        #     print()
+        # except:
+        #     pass
+        # return super().generic_visit(node)
+        if not self.target_node and (getattr(node, 'lineno', -1) == self.lineno):
+            self.target_node = node
+        return super().generic_visit(node)
 
     def visit_Module(self, module):
         """Search the module's top-level expressions
@@ -69,27 +94,31 @@ class ExpressionFinder(ast.NodeTransformer):
         >>> self = ExpressionFinder(lineno=4)
         >>> code = '''
         ...
-        ... a
-        ... b
-        ... c
+        ... foo()
+        ... if 1:
+        ...     if 2:
+        ...         print(12)
         ...
         ... '''
         >>>
         >>> module = ast.parse(code)
 
         """
-        for i, expr in enumerate(module.body):
-            if getattr(expr, 'lineno', -float('inf')) < self.lineno:
-                continue
-            elif expr.lineno == self.lineno:
-                module.body = [expr]
-            else:
-                assert expr.lineno > self.lineno
-                module.body = module.body[i-1:i]
-            break
-        else:
-            module.body = module.body[-1:]
+        self.generic_visit(module)
+        module.body = [self.target_node]
         return module
+        # for i, expr in enumerate(module.body):
+        #     if getattr(expr, 'lineno', -float('inf')) < self.lineno:
+        #         continue
+        #     elif expr.lineno == self.lineno:
+        #         module.body = [expr]
+        #     else:
+        #         assert expr.lineno > self.lineno
+        #         module.body = module.body[i-1:i]
+        #     break
+        # else:
+        #     module.body = module.body[-1:]
+        # return module
 
 class DefunFinder(ast.NodeTransformer):
     """Find the function or method which is defined at a particular line number"""
@@ -444,6 +473,40 @@ class NamespacePromoter(ast.NodeTransformer):
 
         return exprs + func.body
 
+class UnpackIf(ast.NodeTransformer):
+    def __init__(self, buffer):
+        self.buffer = buffer
+
+    def visit_If(self, ifexp):
+        """Pure syntax rewrite of a for loop
+
+        Unroll only the first iteration through the loop.
+
+        >>> self = FirstPassForSimple('foo')
+        >>> code = '''
+        ...
+        ... if 1:
+        ...     print(1)
+        ... elif 2:
+        ...     print(2)
+        ... elif 3:
+        ...     print(3)
+        ... else:
+        ...     print(4)
+        ...
+        ... '''
+        >>> module = ast.parse(code)
+        >>> ifexp, = module.body
+
+        """
+        # ifexp = self.generic_visit(ifexp)
+        nodes = []
+        content = f'if {astor.to_source(ifexp.test).strip()}'
+        nodes.append(make_annotation(buffer=self.buffer, content=content, cell_type='2', lineno=ifexp.lineno))
+        nodes.extend(ifexp.body)
+        nodes.extend(ifexp.orelse)
+        return nodes
+
 class FirstPassForSimple(ast.NodeTransformer):
     def __init__(self, buffer):
         self.buffer = buffer
@@ -475,8 +538,10 @@ class FirstPassForSimple(ast.NodeTransformer):
 
         Unroll only the first iteration through the loop.
 
+        >>> self = FirstPassForSimple('foo')
+
         """
-        loop = self.generic_visit(loop)
+        # loop = self.generic_visit(loop)
 
         # iter(loop.iter)
         iter_call = ast.Call(

@@ -11,6 +11,8 @@ funcs = [
     codebook.syntax.embed,
     codebook.syntax.annotate_toplevel,
     codebook.syntax.expand_loop,
+    codebook.syntax.unpack_if,
+    codebook.syntax.unpack,
 ]
 
 if __name__ == '__main__':

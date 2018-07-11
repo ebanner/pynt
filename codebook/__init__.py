@@ -16,6 +16,9 @@ def handle_exception(type, value, tb):
     while True:
         if not tb.tb_next:
             break
+        next_frame = traceback.extract_tb(tb)[1]
+        if next_frame.filename.startswith('/'): # not our code
+            break
         tb = tb.tb_next
     local_vars = tb.tb_frame.f_locals
 

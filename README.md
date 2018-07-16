@@ -2,6 +2,8 @@
 
 Get your code into a jupyter notebook. Anytime. Anywhere.
 
+Check out my [SciPy 2018 talk](https://youtu.be/MfM_TijHNYE) for the motivation and a feature tour of pynt.
+
 [![MELPA](https://melpa.org/packages/pynt-badge.svg)](https://melpa.org/#/pynt) [![PyPI version](https://badge.fury.io/py/codebook.svg)](https://badge.fury.io/py/codebook) [![Built with Spacemacs](https://cdn.rawgit.com/syl20bnr/spacemacs/442d025779da2f62fc86c2082703697714db6514/assets/spacemacs-badge.svg)](http://spacemacs.org)
 
 ## Features

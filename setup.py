@@ -1,17 +1,12 @@
-import pypandoc
-
 from setuptools import setup
 
-
-def readme():
-    rst = pypandoc.convert_file('README.md', to='rst')
-    return rst
 
 setup(
     name='codebook',
     version='1.1.0',
     description='Emacs minor mode for generating and interacting with jupyter notebooks',
-    long_description=readme(),
+    long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
     url='http://github.com/ebanner/pynt',
     classifiers=[
         'Development Status :: 3 - Alpha',

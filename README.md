@@ -36,7 +36,7 @@ Never forget which cell a code line corresponds to.
 
 *Disclaimer: pynt is in beta. Make sure to back-up your code before using it!*
 
-Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/).
+Install the codebook module with [pip](https://pip.pypa.io/en/stable/).
 
 ```
 $ pip install git+https://github.com/ebanner/pynt # latest version of codebook in github

@@ -39,7 +39,7 @@ Never forget which cell a code line corresponds to.
 Install the codebook module [from PyPI](https://pypi.python.org/pypi/codebook) with [pip](https://pip.pypa.io/en/stable/).
 
 ```
-$ pip install codebook 
+$ pip install git+https://github.com/ebanner/pynt # latest version of codebook in github
 ```
 
 Then install pynt in emacs through [MELPA](https://melpa.org/#/pynt).

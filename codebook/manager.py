@@ -89,7 +89,7 @@ class ExternalIPythonKernelManager(MappingKernelManager):
         >>> kwargs = {}
 
         """
-        kernel_id = super(ExternalIPythonKernelManager, self).start_kernel(**kwargs).result()
+        kernel_id = yield super(ExternalIPythonKernelManager, self).start_kernel(**kwargs)
         if self._should_use_existing():
             self._attach_to_latest_kernel(kernel_id)
         raise gen.Return(kernel_id)
